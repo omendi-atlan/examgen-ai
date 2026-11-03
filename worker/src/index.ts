@@ -409,8 +409,8 @@ export default {
           writtenMarkingNote: "AI-suggested written marks are provisional and require examiner moderation."
         });
         const update = await env.DB.prepare(
-          "UPDATE examination_attempts SET status = 'submitted', submitted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), answers_json = ?, result_json = ? WHERE id = ? AND status = 'in_progress' AND expires_at > ?"
-        ).bind(JSON.stringify(answers), JSON.stringify(result), parsed.value.attemptId, new Date().toISOString()).run();
+          "UPDATE examination_attempts SET status = 'submitted', submitted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), answers_json = ?, result_json = ?, review_status = CASE WHEN ? > 0 THEN 'pending' ELSE 'not_required' END WHERE id = ? AND status = 'in_progress' AND expires_at > ?"
+        ).bind(JSON.stringify(answers), JSON.stringify(result), result.pendingReviewCount, parsed.value.attemptId, new Date().toISOString()).run();
         if (update.meta.changes !== 1) return response({ error: "This attempt was already submitted or has expired." }, 409, origin, allowed);
         return response({ result }, 200, origin, allowed);
       } catch {
