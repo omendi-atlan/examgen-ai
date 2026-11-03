@@ -237,10 +237,10 @@ function decodeBase64Url(value: string): Uint8Array {
 }
 
 async function authenticateExaminer(request: Request, env: Env): Promise<{ email: string } | null> {
-  const domain = env.ACCESS_TEAM_DOMAIN?.trim().replace(/^https?:\\/\\//, "").replace(/\\/$/, "");
+  const domain = env.ACCESS_TEAM_DOMAIN?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
   const audience = env.ACCESS_AUD?.trim();
   const token = request.headers.get("Cf-Access-Jwt-Assertion");
-  if (!domain || !/^[a-z0-9-]+\\.cloudflareaccess\\.com$/i.test(domain) || !audience || !token) return null;
+  if (!domain || !/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain) || !audience || !token) return null;
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
@@ -309,7 +309,7 @@ export default {
         }
       }
 
-      const detailMatch = url.pathname.match(/^\\/api\\/examinations\\/reviews\\/([0-9a-f-]{36})$/i);
+      const detailMatch = url.pathname.match(/^\/api\/examinations\/reviews\/([0-9a-f-]{36})$/i);
       if (detailMatch && request.method === "GET") {
         try {
           const row = await env.DB.prepare(
