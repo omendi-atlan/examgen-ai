@@ -39,7 +39,11 @@ beforeAll(async () => {
       expires_at TEXT NOT NULL,
       submitted_at TEXT,
       answers_json TEXT,
-      result_json TEXT
+      result_json TEXT,
+      review_status TEXT NOT NULL DEFAULT 'not_required',
+      moderation_json TEXT,
+      moderated_by TEXT,
+      moderated_at TEXT
     )
   `).run();
   await env.DB.prepare(
