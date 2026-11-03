@@ -8,13 +8,18 @@ type Question = {
   options?:string[]; visualDescription?:string;
 };
 type Exam = { title:string; subject:string; durationMinutes:number; totalMarks:number; instructions:string[]; questions:Question[] };
-type QuestionResult = { questionId:string; marksAvailable:number; marksAwarded:number|null; status:string; explanation:string|null };
+type QuestionResult = { questionId:string; marksAvailable:number; marksAwarded:number|null; status:string; explanation:string|null; rubric?:{criteria:Array<{criterion:string;marks:number;descriptors:{full:string;partial:string;none:string}}>}; criteriaResults?:Array<{criterion:string;marksAvailable:number;marksAwarded:number;descriptor:string}> };
 type Result = { status:string; objectiveScore:number; autoMarkTotal:number; totalMarks:number; pendingReviewCount:number; writtenMarkingNote:string|null; questionResults:QuestionResult[] };
 
 const starterQuestions = [
   {id:"Q1",section:"Section A",prompt:"Which option best describes a project constraint?",type:"multiple_choice",marks:2,difficulty:"foundation",options:["A temporary limitation affecting delivery","A project benefit","A stakeholder title","A project celebration"],answer:"A temporary limitation affecting delivery",explanation:"A constraint limits one or more aspects of project delivery."},
   {id:"Q2",section:"Section B",prompt:"Explain why a project manager should monitor risks throughout a project.",type:"short_answer",marks:3,difficulty:"intermediate",answer:"Risk monitoring identifies changes in exposure and checks whether responses remain effective.",explanation:"Use the rubric to assess the response.",rubric:{criteria:[{criterion:"Identifies changing risk exposure",marks:1,descriptors:{full:"Explains that risks can change over time.",partial:"Mentions changing risks without explanation.",none:"Does not identify changing exposure."}},{criterion:"Explains response effectiveness",marks:1,descriptors:{full:"Explains why controls or responses need review.",partial:"Mentions responses without review.",none:"Does not address responses."}},{criterion:"Connects monitoring to project outcomes",marks:1,descriptors:{full:"Connects monitoring to timely action or project objectives.",partial:"Makes a limited connection.",none:"No relevant connection."}}]}}
 ];
+
+function criteriaDefault(question:Question, resultById:Map<string,QuestionResult>):string[]{
+ const current=resultById.get(question.id)?.criteriaResults;
+ return current?.map(item=>String(item.marksAwarded))??[];
+}
 
 export default function Home(){
  const apiBase=process.env.NEXT_PUBLIC_EXAMGEN_API_URL;
@@ -31,11 +36,29 @@ export default function Home(){
  const [remainingSeconds,setRemainingSeconds]=useState(0);
  const [autoSubmitTriggered,setAutoSubmitTriggered]=useState(false);
  const [answers,setAnswers]=useState<Record<string,string>>({});
+ const [markDrafts,setMarkDrafts]=useState<Record<string,string[]>>({});
  const [result,setResult]=useState<Result|null>(null);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const timerLabel=`${Math.floor(remainingSeconds/60).toString().padStart(2,"0")}:${(remainingSeconds%60).toString().padStart(2,"0")}`;
  const resultById=useMemo(()=>new Map((result?.questionResults??[]).map(x=>[x.questionId,x])),[result]);
+
+ async function saveSelfAssessment(questionId:string){
+  if(!attemptId||!result||busy)return;
+  const questionResult=result.questionResults.find(item=>item.questionId===questionId);
+  const criteria=questionResult?.rubric?.criteria??[];
+  const draft=markDrafts[questionId]??[];
+  if(!criteria.length||draft.length!==criteria.length||draft.some(value=>value==="")){
+   setError("Enter a mark for every rubric criterion before saving.");return;
+  }
+  setBusy(true);setError("");
+  try{
+   const response=await fetch(`${apiBase?.replace(/\/$/,"")}/api/examinations/attempts/mark-written`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({attemptId,questionId,criteria:draft.map(value=>({marksAwarded:Number(value)}))})});
+   const payload=await response.json();
+   if(!response.ok)throw new Error(payload.error||"Self-assessment could not be saved.");
+   setResult(payload.result);
+  }catch(e){setError(e instanceof Error?e.message:"Self-assessment could not be saved.")}finally{setBusy(false)}
+ }
 
  async function createExam(){
   setBusy(true);setError("");setResult(null);setAttemptId("");setExpiresAt("");setRemainingSeconds(0);setAutoSubmitTriggered(false);setAnswers({});setExam(null);
@@ -100,7 +123,12 @@ export default function Home(){
      :q.type==="multiple_choice"&&q.options?<div>{q.options.map(o=><label className="option" key={o}><input type="radio" name={q.id} disabled={!!result||remainingSeconds===0} checked={answers[q.id]===o} onChange={()=>setAnswers(a=>({...a,[q.id]:o}))}/>{o}</label>)}</div>
      :q.type==="numeric"?<input className="answer" type="number" aria-label={`Answer for ${q.id}`} disabled={!!result||remainingSeconds===0} value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))}/>
      :<textarea className="answer" rows={q.type==="long_answer"?6:3} aria-label={`Answer for ${q.id}`} disabled={!!result||remainingSeconds===0} value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))} placeholder="Write your answer here…"/>}
-     {result&&<p className="muted"><b>{resultById.get(q.id)?.status==="pending_manual_review"?"Pending rubric/manual assessment":`${resultById.get(q.id)?.marksAwarded??0} / ${q.marks} marks`}</b>{resultById.get(q.id)?.explanation?<> · {resultById.get(q.id)?.explanation}</>:null}</p>}
+     {result&&<div className="muted"><b>{resultById.get(q.id)?.status==="pending_manual_review"?"Pending rubric/manual assessment":resultById.get(q.id)?.status==="self_assessed"?`Self-assessed: ${resultById.get(q.id)?.marksAwarded??0} / ${q.marks} (not an official mark)`:`${resultById.get(q.id)?.marksAwarded??0} / ${q.marks} marks`}</b>{resultById.get(q.id)?.explanation?<> · {resultById.get(q.id)?.explanation}</>:null}
+      {(resultById.get(q.id)?.status==="pending_manual_review"||resultById.get(q.id)?.status==="self_assessed")&&resultById.get(q.id)?.rubric&&<div className="panel" style={{marginTop:12}}><b>Written-answer rubric · self-assessment</b><p className="muted">Compare your answer with each descriptor and select a mark. This is a learning aid, not an examiner-approved grade.</p>
+       {resultById.get(q.id)?.rubric?.criteria.map((criterion,index)=><label key={index}>{criterion.criterion} ({criterion.marks} marks)<p className="muted">Full: {criterion.descriptors.full}<br/>Partial: {criterion.descriptors.partial}<br/>None: {criterion.descriptors.none}</p><select value={markDrafts[q.id]?.[index]??String(resultById.get(q.id)?.criteriaResults?.[index]?.marksAwarded??"")} onChange={e=>setMarkDrafts(current=>{const next=[...(current[q.id]??criteriaDefault(q, resultById))];next[index]=e.target.value;return {...current,[q.id]:next};})}><option value="">Select awarded marks</option>{Array.from({length:criterion.marks+1},(_,mark)=><option key={mark} value={String(mark)}>{mark}</option>)}</select></label>)}
+       <button className="btn" onClick={()=>saveSelfAssessment(q.id)} disabled={busy}>{busy?"Saving…":"Save self-assessment"}</button>
+      </div>}
+     </div>}
     </article>)}
     {!result?<button className="btn" onClick={submit} disabled={busy}>{busy?"Submitting…":error?"Retry submission":"Submit examination"}</button>
     :<div className="stat"><b>{result.status==="provisional"?"Provisional result":"Marked result"}</b><b>{result.objectiveScore} / {result.autoMarkTotal} objectively marked</b><p className="muted">{result.pendingReviewCount} written response(s) pending human assessment. {result.writtenMarkingNote}</p></div>}
