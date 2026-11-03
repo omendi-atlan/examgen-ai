@@ -18,6 +18,12 @@ type QuestionType = "multiple_choice" | "dropdown" | "short_answer" | "long_answ
 type Difficulty = "foundation" | "intermediate" | "advanced";
 type Mode = "practice" | "simulation";
 
+type RubricCriterion = {
+  criterion: string;
+  marks: number;
+  descriptors: { full: string; partial: string; none: string };
+};
+
 type GeneratedQuestion = {
   id: string;
   section: string;
@@ -29,6 +35,7 @@ type GeneratedQuestion = {
   answer: string;
   explanation: string;
   visualDescription?: string;
+  rubric?: { criteria: RubricCriterion[] };
 };
 
 type GeneratedExam = {
@@ -40,7 +47,7 @@ type GeneratedExam = {
   questions: GeneratedQuestion[];
 };
 
-type PublicQuestion = Omit<GeneratedQuestion, "answer" | "explanation">;
+type PublicQuestion = Omit<GeneratedQuestion, "answer" | "explanation" | "rubric">;
 type PublicExam = Omit<GeneratedExam, "questions"> & { questions: PublicQuestion[] };
 
 const QUESTION_TYPES: QuestionType[] = ["multiple_choice", "dropdown", "short_answer", "long_answer", "numeric"];
@@ -64,7 +71,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function publicExam(exam: GeneratedExam): PublicExam {
   return {
     ...exam,
-    questions: exam.questions.map(({ answer: _answer, explanation: _explanation, ...question }) => question)
+    questions: exam.questions.map(({ answer: _answer, explanation: _explanation, rubric: _rubric, ...question }) => question)
   };
 }
 
@@ -98,6 +105,20 @@ function validateExam(value: unknown, subject: string, totalMarks: number, durat
           !item.options.every((option) => typeof option === "string" && option.length > 0 && option.length <= 300) ||
           new Set(item.options).size !== item.options.length || !item.options.includes(item.answer)) return false;
     } else if (item.options !== undefined) {
+      return false;
+    }
+    const written = item.type === "short_answer" || item.type === "long_answer";
+    if (written) {
+      if (!isRecord(item.rubric) || !Array.isArray(item.rubric.criteria) || item.rubric.criteria.length < 1 || item.rubric.criteria.length > 8) return false;
+      let rubricMarks = 0;
+      for (const criterion of item.rubric.criteria) {
+        if (!isRecord(criterion) || typeof criterion.criterion !== "string" || criterion.criterion.trim().length < 3 || criterion.criterion.length > 300 ||
+            !Number.isInteger(criterion.marks) || Number(criterion.marks) < 1 || !isRecord(criterion.descriptors) ||
+            !["full", "partial", "none"].every((key) => typeof criterion.descriptors[key] === "string" && String(criterion.descriptors[key]).length >= 3 && String(criterion.descriptors[key]).length <= 500)) return false;
+        rubricMarks += Number(criterion.marks);
+      }
+      if (rubricMarks !== Number(item.marks)) return false;
+    } else if (item.rubric !== undefined) {
       return false;
     }
     marks += Number(item.marks);
@@ -249,7 +270,7 @@ export default {
       `Total marks: exactly ${totalMarks}`,
       "Return JSON with title, subject, durationMinutes, totalMarks, instructions (array), and questions (array).",
       "Each question must contain id, section, prompt, type (multiple_choice|dropdown|short_answer|long_answer|numeric), marks (positive integer), difficulty (foundation|intermediate|advanced), answer and explanation.",
-      "Objective questions must contain 4 distinct options and an answer exactly matching one option. Written questions must not contain options.",
+      "Objective questions must contain 4 distinct options and an answer exactly matching one option. Written questions must not contain options and must include a rubric with 1-8 criteria; each criterion has a positive integer mark value and full, partial and none performance descriptors. Rubric criterion marks must sum exactly to the written question marks.",
       `The marks across all questions must sum to exactly ${totalMarks}.`,
       visualRequirements
         ? "If an essential visual is needed, add a concise visualDescription string to the question; do not claim an image was generated."
