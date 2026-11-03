@@ -288,6 +288,25 @@ async function readJson(request: Request): Promise<{ value?: unknown; error?: st
   catch { return { error: "Request body must be valid JSON." }; }
 }
 
+const EXAMINER_HTML = String.raw\`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EXAMGEN AI · Examiner moderation</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#090d14;color:#eef2f7}
+body{margin:0;padding:32px 18px}.shell{max-width:1000px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #293241;padding-bottom:20px}.brand{font-weight:800;letter-spacing:.08em}.brand b{color:#f97316}.muted{color:#aab5c4}.panel{background:#111925;border:1px solid #293241;border-radius:16px;padding:22px;margin-top:18px}.item,.question{border:1px solid #293241;border-radius:12px;padding:16px;margin:12px 0}.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.btn{background:#f97316;color:#111;border:0;border-radius:9px;padding:11px 16px;font-weight:750;cursor:pointer}.secondary{background:#273449;color:#eef2f7}.btn:disabled{opacity:.5;cursor:not-allowed}input{background:#0b111a;border:1px solid #445064;border-radius:8px;padding:10px;color:white;width:100px}label{display:block;margin:12px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.rubric{background:#0b111a;padding:12px;border-radius:8px;margin-top:10px}.error{color:#fca5a5}.good{color:#86efac}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:650px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style></head><body><main class="shell"><header class="top"><div><div class="brand">EXAMGEN <b>AI</b></div><h1>Examiner moderation</h1><p class="muted">Review AI-assisted marking and record final examiner decisions.</p></div><button class="btn secondary" onclick="loadQueue()">Refresh queue</button></header>
+<section class="panel"><h2>Pending written assessments</h2><div id="queue" class="muted">Loading review queue…</div></section>
+<section id="detail" class="panel" hidden><h2 id="review-title">Review submission</h2><p id="review-meta" class="muted"></p><div id="questions"></div><button id="finalise" class="btn" onclick="finaliseReview()">Approve final marks</button><p id="message" class="muted"></p></section>
+</main><script>
+var current=null, writtenQuestions=[];
+function esc(value){return String(value==null?"":value).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[c]})}
+async function api(path,options){var response=await fetch(path,Object.assign({credentials:"same-origin"},options||{}));var data=await response.json().catch(function(){return {error:"Unexpected server response."}});if(!response.ok)throw new Error(data.error||"Request failed ("+response.status+")");return data}
+async function loadQueue(){var target=document.getElementById("queue");target.textContent="Loading…";try{var data=await api("/api/examinations/reviews");if(!data.reviews.length){target.textContent="No written submissions are awaiting moderation.";return}target.innerHTML=data.reviews.map(function(item){return '<div class="item"><div><b>'+esc(item.subject)+'</b><div class="muted">'+esc(item.mode)+' · Submitted '+esc(item.submitted_at||"")+'</div><small class="muted">'+esc(item.id)+'</small></div><button class="btn" onclick="openReview(\\''+esc(item.id)+'\\')">Review</button></div>'}).join("")}catch(error){target.innerHTML='<p class="error">'+esc(error.message)+'</p>'}}
+async function openReview(id){try{var data=await api("/api/examinations/reviews/"+encodeURIComponent(id));current=data.review;writtenQuestions=current.exam.questions.filter(function(q){return q.type==="short_answer"||q.type==="long_answer"});document.getElementById("review-title").textContent=current.exam.title;document.getElementById("review-meta").textContent=current.subject+" · "+current.mode+" · "+current.submittedAt;var results=current.result.questionResults||[];document.getElementById("questions").innerHTML=writtenQuestions.map(function(q,index){var answer=current.answers[q.id]||"";var result=results.find(function(r){return r.questionId===q.id})||{};var criteria=(q.rubric&&q.rubric.criteria)||[];var ai=(result.criteria||[]).map(function(c){return '<div class="rubric"><b>'+esc(c.criterion)+' · AI '+esc(c.marksAwarded)+'/'+esc(c.marksAvailable)+'</b><p>Evidence: '+esc(c.evidence)+'</p><p>'+esc(c.rationale)+'</p></div>'}).join("");var rubric=criteria.map(function(c){return '<div class="rubric"><b>'+esc(c.criterion)+' · '+esc(c.marks)+' marks</b><p>Full: '+esc(c.descriptors.full)+'</p><p>Partial: '+esc(c.descriptors.partial)+'</p><p>None: '+esc(c.descriptors.none)+'</p></div>'}).join("");return '<article class="question"><h3>Question '+(index+1)+' · '+esc(q.marks)+' marks</h3><p>'+esc(q.prompt)+'</p><h4>Student response</h4><pre>'+esc(answer)+'</pre><h4>Model answer / marking guidance</h4><pre>'+esc(q.answer)+'</pre><h4>Rubric</h4>'+rubric+(ai?'<h4>AI provisional assessment</h4>'+ai:'<p class="muted">No AI provisional assessment was available. Mark manually using the rubric.</p>')+'<label>Final examiner mark (0–'+esc(q.marks)+')<br><input type="number" id="mark-'+index+'" min="0" max="'+esc(q.marks)+'" step="1" value="'+esc(result.provisionalMarks==null?"":result.provisionalMarks)+'" required></label></article>'}).join("");document.getElementById("detail").hidden=false;document.getElementById("message").textContent="AI marks are advisory only. Your submitted marks become the final written marks.";document.getElementById("detail").scrollIntoView({behavior:"smooth"})}catch(error){alert(error.message)}}
+async function finaliseReview(){if(!current)return;var marks={};for(var i=0;i<writtenQuestions.length;i++){var q=writtenQuestions[i],input=document.getElementById("mark-"+i),value=Number(input.value);if(input.value===""||!Number.isInteger(value)||value<0||value>q.marks){document.getElementById("message").innerHTML='<span class="error">Enter a valid whole-number mark for every written question.</span>';input.focus();return}marks[q.id]=value}var button=document.getElementById("finalise");button.disabled=true;try{var data=await api("/api/examinations/reviews/moderate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({attemptId:current.id,questionMarks:marks})});document.getElementById("message").innerHTML='<span class="good">Final mark recorded: '+esc(data.result.finalScore)+' / '+esc(data.result.totalMarks)+'. Moderated by '+esc(data.result.moderation.moderatedBy)+'.</span>';button.hidden=true;await loadQueue()}catch(error){document.getElementById("message").innerHTML='<span class="error">'+esc(error.message)+'</span>';button.disabled=false}}
+loadQueue();
+</script></body></html>\`;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get("Origin") ?? "";
@@ -307,6 +326,21 @@ export default {
       return response({ status: "ok", service: "examgen-ai-api", database: "configured" }, 200, origin, allowed);
     }
     if (origin !== allowed) return response({ error: "Origin not allowed." }, 403);
+
+    if (url.pathname === "/examiner" && request.method === "GET") {
+      const examiner = await authenticateExaminer(request, env);
+      if (!examiner) return response({ error: "Examiner authentication is required." }, 401, origin, allowed);
+      return new Response(EXAMINER_HTML, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "no-referrer",
+          "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        }
+      });
+    }
 
     if (url.pathname.startsWith("/api/examinations/reviews")) {
       const examiner = await authenticateExaminer(request, env);
