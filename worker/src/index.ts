@@ -113,8 +113,9 @@ function validateExam(value: unknown, subject: string, totalMarks: number, durat
       let rubricMarks = 0;
       for (const criterion of item.rubric.criteria) {
         if (!isRecord(criterion) || typeof criterion.criterion !== "string" || criterion.criterion.trim().length < 3 || criterion.criterion.length > 300 ||
-            !Number.isInteger(criterion.marks) || Number(criterion.marks) < 1 || !isRecord(criterion.descriptors) ||
-            !["full", "partial", "none"].every((key) => typeof criterion.descriptors[key] === "string" && String(criterion.descriptors[key]).length >= 3 && String(criterion.descriptors[key]).length <= 500)) return false;
+            !Number.isInteger(criterion.marks) || Number(criterion.marks) < 1 || !isRecord(criterion.descriptors)) return false;
+        const descriptors = criterion.descriptors;
+        if (!["full", "partial", "none"].every((key) => typeof descriptors[key] === "string" && String(descriptors[key]).length >= 3 && String(descriptors[key]).length <= 500)) return false;
         rubricMarks += Number(criterion.marks);
       }
       if (rubricMarks !== Number(item.marks)) return false;
