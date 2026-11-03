@@ -54,10 +54,29 @@ beforeAll(async () => {
   await env.DB.prepare(
     "CREATE INDEX IF NOT EXISTS idx_attempts_created ON examination_attempts(created_at)"
   ).run();
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS api_rate_limits (
+      ip_hash TEXT PRIMARY KEY,
+      window_start INTEGER NOT NULL,
+      request_count INTEGER NOT NULL
+    )
+  `).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_api_rate_limits_window ON api_rate_limits(window_start)"
+  ).run();
+  fetchMock.activate();
+  env.OPENAI_API_KEY = "integration-test-key";
+  fetchMock.get("https://api.openai.com")
+    .intercept({ path: "/v1/chat/completions", method: "POST" })
+    .reply(200, {
+      choices: [{ message: { content: JSON.stringify(generatedExam) } }]
+    })
+    .persist();
 });
 
 beforeEach(async () => {
-  await env.DB.prepare("DELETE FROM examination_attempts").run();\n  await env.DB.prepare("DELETE FROM api_rate_limits").run();
+  await env.DB.prepare("DELETE FROM examination_attempts").run();
+  await env.DB.prepare("DELETE FROM api_rate_limits").run();
 });
 
 describe("Cloudflare Worker + D1 integration", () => {
