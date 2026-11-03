@@ -106,7 +106,9 @@ function validateExam(value: unknown): value is Exam {
       for (const c of q.rubric.criteria) {
         if (!isRecord(c) || typeof c.criterion !== "string" || c.criterion.trim().length < 2 ||
             !Number.isInteger(c.marks) || Number(c.marks) < 1 || !isRecord(c.descriptors)) return false;
-        if (!(["full", "partial", "none"] as const).every((k) => typeof c.descriptors[k] === "string" && String(c.descriptors[k]).length >= 2 && String(c.descriptors[k]).length <= 1000)) return false;
+        if (!isRecord(c.descriptors)) return false;
+        const descriptors = c.descriptors;
+        if (!(["full", "partial", "none"] as const).every((k) => typeof descriptors[k] === "string" && String(descriptors[k]).length >= 2 && String(descriptors[k]).length <= 1000)) return false;
         rubricTotal += Number(c.marks);
       }
       if (rubricTotal !== Number(q.marks)) return false;
