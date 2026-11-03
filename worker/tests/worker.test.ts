@@ -11,7 +11,7 @@ const exam = {
   instructions: ["Answer all questions."],
   questions: [
     { id: "q1", section: "A", prompt: "Select the correct option.", type: "multiple_choice", marks: 2, difficulty: "foundation", options: ["A", "B"], answer: "B", explanation: "B is correct." },
-    { id: "q2", section: "B", prompt: "Explain the concept clearly.", type: "short_answer", marks: 3, difficulty: "intermediate", answer: "A model answer", explanation: "Award marks for relevant reasoning." }
+    { id: "q2", section: "B", prompt: "Explain the concept clearly.", type: "short_answer", marks: 3, difficulty: "intermediate", answer: "A model answer", explanation: "Award marks for relevant reasoning.", rubric: { criteria: [{ criterion: "Conceptual accuracy", marks: 3, descriptors: { full: "Accurate explanation", partial: "Partially accurate", none: "No relevant explanation" } }] } }
   ]
 };
 
@@ -81,6 +81,32 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
     assert.equal(payload.result.pendingReviewCount, 1);
     assert.equal(payload.result.status, "pending_review");
     assert.equal(db.row?.status, "submitted");
+  });
+
+  it("returns bounded, provisional criterion-level AI marks for written answers", async () => {
+    const db = seededDb();
+    const env = makeEnv(db);
+    env.OPENAI_API_KEY = "test-key";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ evaluations: [{
+        questionId: "q2",
+        criteria: [{ marksAwarded: 2, evidence: "The answer identifies the core concept.", rationale: "Mostly accurate, but missing one detail." }]
+      }] }) } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } })) as typeof fetch;
+    try {
+      const response = await worker.fetch(request("/api/examinations/attempts/submit", {
+        attemptId, answers: { q1: "B", q2: "My explanation" }
+      }), env);
+      const payload = await response.json() as { result: { status: string; provisionalWrittenScore: number; questionResults: Array<{ provisionalMarks?: number; criteria?: Array<{ evidence: string }> }> } };
+      assert.equal(response.status, 200);
+      assert.equal(payload.result.status, "pending_review");
+      assert.equal(payload.result.provisionalWrittenScore, 2);
+      assert.equal(payload.result.questionResults[1].provisionalMarks, 2);
+      assert.equal(payload.result.questionResults[1].criteria?.[0].evidence, "The answer identifies the core concept.");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("rejects a second submission for the same attempt", async () => {
