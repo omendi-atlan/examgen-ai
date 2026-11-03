@@ -66,7 +66,6 @@ beforeAll(async () => {
     "CREATE INDEX IF NOT EXISTS idx_api_rate_limits_window ON api_rate_limits(window_start)"
   ).run();
   fetchMock.activate();
-  env.OPENAI_API_KEY = "integration-test-key";
   fetchMock.get("https://api.openai.com")
     .intercept({ path: "/v1/chat/completions", method: "POST" })
     .reply(200, {
