@@ -45,7 +45,10 @@ Phase 1 focuses on the examination-engine foundations in Modules 3, 5, 6 and 7 w
 - Examiner queue, detail and moderation endpoints require a Cloudflare Access JWT. The Worker validates the RS256 signature against the Access JWKS, then checks issuer, audience, expiry and examiner identity.
 - An examiner must provide a final mark for every written question, within its mark allocation. The decision is recorded with examiner identity and timestamp; only then is the result marked final.
 - The examiner interface is served by the Worker at `/examiner` and must be protected by a Cloudflare Access application. Protect the review API path separately; do not protect the whole Worker because student generation and submission routes remain public.
-- Configure Worker variables `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` after creating the Access applications.
+- In Cloudflare Zero Trust, create self-hosted Access applications for the Worker hostname paths `/examiner` and `/api/examinations/reviews*`. Apply an allow policy restricted to the intended examiner email address(es); do not use an Everyone policy.
+- Protect only those two paths. Do not protect the entire Worker because student generation and submission routes must remain publicly reachable.
+- Set Worker variable `ACCESS_TEAM_DOMAIN` to the Zero Trust team domain (for example, `your-team.cloudflareaccess.com`). Set `ACCESS_AUD` to the comma-separated audience tags for the two Access applications. These are identifiers, not secrets.
+- The examiner page is served at `https://examgen-ai-api.omendi72.workers.dev/examiner`.
 
 ## Abuse and request controls
 
