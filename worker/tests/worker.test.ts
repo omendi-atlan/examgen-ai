@@ -1,4 +1,4 @@
-import { afterEach, describe, it } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import worker, { type Env } from "../src/index";
 
