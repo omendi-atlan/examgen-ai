@@ -1,3 +1,12 @@
+interface D1PreparedStatement {
+  bind(...values: unknown[]): D1PreparedStatement;
+  first<T>(): Promise<T | null>;
+  run(): Promise<{ meta: { changes: number } }>;
+}
+interface D1Database {
+  prepare(query: string): D1PreparedStatement;
+}
+
 export interface Env {
   OPENAI_API_KEY: string;
   OPENAI_MODEL?: string;
@@ -79,6 +88,7 @@ function validateExam(value: unknown, subject: string, totalMarks: number, durat
     if (!Number.isInteger(item.marks) || Number(item.marks) < 1 || Number(item.marks) > totalMarks) return false;
     if (!DIFFICULTIES.includes(item.difficulty as Difficulty)) return false;
     if (typeof item.answer !== "string" || item.answer.length > 5000) return false;
+    if (item.type === "numeric" && (item.answer.trim() === "" || !Number.isFinite(Number(item.answer)))) return false;
     if (typeof item.explanation !== "string" || item.explanation.length > 5000) return false;
     if (item.visualDescription !== undefined &&
         (typeof item.visualDescription !== "string" || item.visualDescription.length > 1200)) return false;
