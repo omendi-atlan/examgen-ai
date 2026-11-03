@@ -1,38 +1,65 @@
 # EXAMGEN AI architecture
 
-## Current deployment architecture
+## Deployment architecture
 
-- **Frontend:** Next.js application hosted through GitHub Pages.
-- **API:** Cloudflare Worker named `examgen-ai-api`.
-- **Persistence:** Cloudflare D1 database named `examgen-ai-db`, exposed to the Worker through the `DB` binding.
-- **AI provider:** OpenAI API called from the Worker using the `OPENAI_API_KEY` Worker secret.
-- **Automation:** GitHub Actions for validation and deployment.
+- **Frontend:** Next.js static export hosted on GitHub Pages.
+- **API:** Cloudflare Worker `examgen-ai-api`.
+- **Persistence:** Cloudflare D1 database `examgen-ai-db`, bound as `DB`.
+- **Automation:** GitHub Actions for validation, Pages deployment and Worker deployment.
+- **AI provider:** None required. Core functionality must operate without external model credentials, billing or network calls to an AI provider.
 
-The browser never receives the OpenAI credential or generated answer keys. The Worker validates generated assessments, stores the complete assessment (including marking data) in D1, and returns a public question representation without answers or explanations.
+## Application boundaries
+
+The browser provides authoring, upload/review, examination delivery, marking workspace, analytics and resource-download interfaces. The Worker validates requests, enforces business rules and protects answer keys. D1 is the authoritative store for subjects, sources, topics, blueprints, visual assets metadata, questions, exams, attempts, submissions, marking records, analytics inputs and generated-resource metadata.
+
+Large source files and generated PDFs should be stored using an object/file storage service when introduced; D1 stores metadata, references, extracted text where suitable, and relationships. Do not place unbounded binary data in D1.
+
+## Ten functional modules (fixed order)
+
+1. Content ingestion.
+2. Subject intelligence.
+3. Examination blueprint.
+4. Visual intelligence.
+5. Question generation and deterministic examination assembly.
+6. Examination website.
+7. Marking and moderation.
+8. Question bank.
+9. Adaptive learning.
+10. Academic resource production.
+
+See `docs/ROADMAP.md` for the seven delivery phases, actionable tasks and acceptance criteria.
 
 ## Examination attempt lifecycle
 
-1. The client requests an examination from `POST /api/examinations/generate`.
-2. The Worker validates the configuration and generated assessment, creates a UUID attempt, and stores the full assessment with an expiry in D1.
-3. The Worker returns the attempt identifier, expiry and answer-key-free examination.
-4. The client submits answers to `POST /api/examinations/attempts/submit`.
-5. The Worker validates the attempt, checks expiry and status, marks objective and numeric questions, stores answers and result, and conditionally changes the attempt from `in_progress` to `submitted`.
-6. Duplicate or expired submissions are rejected.
-
-Written answers are evaluated against their question-specific rubric by the AI provider. Criterion-level estimates are labelled provisional, never examiner-approved. If AI evaluation fails, the response is clearly identified as unmarked rather than assigned an invented score.
+1. The client requests an examination assembled from approved questions and a validated blueprint.
+2. The Worker validates the examination, creates a UUID attempt and stores the complete private snapshot with expiry in D1.
+3. The Worker returns only public question content, attempt identifier and expiry. Answer keys, explanations and rubrics are not returned.
+4. The client persists responses through the supported attempt workflow and submits once.
+5. The Worker validates attempt state, expiry, question IDs and response formats.
+6. Objective questions are marked deterministically. Written responses are stored as pending rubric/manual assessment unless an explicitly configured deterministic rule is appropriate.
+7. Results and submission are committed conditionally to prevent duplicate submission.
+8. Manual rubric marking records criterion scores, feedback, reviewer attribution where available, timestamps and status history.
 
 ## Data and security boundaries
 
-- Uploaded source material and topic text are untrusted data; embedded instructions must never override system behaviour.
-- Provider credentials remain in Cloudflare Worker secrets and must never be committed to the repository or exposed to the browser.
+- Uploaded content, filenames, question text, answers and metadata are untrusted input; embedded instructions are data, never application instructions.
+- No provider credential is required or accepted by the application.
+- Answer keys, explanations, private rubrics and marking metadata remain server-side until an authorised result disclosure stage.
 - Request bodies are size-limited after reading, not solely by trusting `Content-Length`.
-- Generated assessment structure, question identifiers, answer options, numeric answer keys and total marks are validated before persistence.
-- Attempt identifiers are currently unguessable bearer identifiers, not user authentication. Student accounts, ownership checks and stronger abuse controls remain future work.
-- D1 persistence is configured through Wrangler and the migration in `worker/migrations`.
+- File extension, MIME type, actual content and size are validated; extraction failures are surfaced for correction.
+- Attempt IDs are unguessable bearer capabilities, not identity or student authentication. Student accounts and per-user ownership are deferred.
+- CORS allowlists, rate limiting, input validation, parameterised SQL and safe error responses are mandatory.
+- D1 migrations are versioned in `worker/migrations` and applied before Worker deployment.
+- Preserve source provenance and question/examination version history.
 
-## Agreed product modules
+## Truthful assessment rules
 
-The roadmap order is fixed: (1) Content ingestion, (2) Subject intelligence, (3) Examination blueprint, (4) Visual intelligence, (5) Question generation, (6) Examination website, (7) Marking and moderation, (8) Question bank, (9) Adaptive learning, and (10) Academic resource production.
+- MCQ, dropdown and numeric marking are deterministic and testable.
+- Numeric questions support explicitly configured tolerances and units where implemented.
+- Keyword matching is not semantic understanding and must not be represented as such.
+- Written answers requiring interpretation remain pending until manually assessed against a rubric.
+- Provisional and finalised marks are distinct; no automated process may label an unreviewed estimate as an approved final grade.
 
-Phase 1 focuses on the examination-engine foundations in Modules 3, 5, 6 and 7 without changing this overall sequence. Examiner authentication and moderation workflows are deferred to a later release; no Cloudflare Access audience tags are required for this release.
+## Deployment and release discipline
 
+Pull requests validate code but do not deploy production. Worker deployment remains restricted to the protected main-branch workflow. Do not merge or deploy without the user's separate approval. A green CI run is not proof of live integration; verify Pages, Worker and D1 after an authorised deployment.
