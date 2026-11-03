@@ -45,7 +45,7 @@ class FakeD1 {
 }
 
 function makeEnv(db: FakeD1): Env {
-  return { OPENAI_API_KEY: "test-key", ALLOWED_ORIGIN: ORIGIN, DB: db as unknown as Env["DB"] };
+  return { OPENAI_API_KEY: "", ALLOWED_ORIGIN: ORIGIN, DB: db as unknown as Env["DB"] };
 }
 function request(path: string, body: unknown, origin = ORIGIN) {
   return new Request("https://worker.test" + path, {
