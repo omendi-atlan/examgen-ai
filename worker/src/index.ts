@@ -265,6 +265,20 @@ async function authenticateExaminer(request: Request, env: Env): Promise<{ email
   }
 }
 
+async function allowGeneration(request: Request, env: Env): Promise<boolean> {
+  const clientIp = request.headers.get("CF-Connecting-IP");
+  if (!clientIp) return false;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(clientIp));
+  const ipHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const windowStart = Math.floor(Date.now() / 600_000) * 600_000;
+  await env.DB.prepare(
+    "INSERT INTO api_rate_limits (ip_hash, window_start, request_count) VALUES (?, ?, 1) ON CONFLICT(ip_hash) DO UPDATE SET request_count = CASE WHEN api_rate_limits.window_start = excluded.window_start THEN api_rate_limits.request_count + 1 ELSE 1 END, window_start = excluded.window_start"
+  ).bind(ipHash, windowStart).run();
+  const row = await env.DB.prepare("SELECT request_count FROM api_rate_limits WHERE ip_hash = ?")
+    .bind(ipHash).first<{ request_count: number }>();
+  return (row?.request_count ?? 0) <= 5;
+}
+
 async function readJson(request: Request): Promise<{ value?: unknown; error?: string }> {
   const declaredLength = Number(request.headers.get("Content-Length") ?? "0");
   if (declaredLength > MAX_BODY_BYTES) return { error: "Request is too large." };
@@ -443,6 +457,10 @@ export default {
       (mode !== "practice" && mode !== "simulation") ||
       !["balanced", "foundation", "challenging", "advanced"].includes(String(difficulty))
     ) return response({ error: "Invalid examination configuration. Check subject, topics, marks, duration, mode and difficulty." }, 400, origin, allowed);
+
+    if (!(await allowGeneration(request, env))) {
+      return response({ error: "Generation limit reached. Please wait before requesting another assessment." }, 429, origin, allowed);
+    }
 
     const cleanTopics = (topics as string[]).map((topic) => topic.trim());
     const visualRequirements = input.visualRequirements === true;
