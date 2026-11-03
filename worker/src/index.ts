@@ -303,7 +303,7 @@ export default {
           if (evaluation) Object.assign(questionResult, evaluation, { status: "provisionally_marked" });
         }
         result.pendingReviewCount = Math.max(0, result.pendingReviewCount - rubricEvaluations.size);
-        result.status = result.pendingReviewCount > 0 ? "provisional" : "marked";
+        result.status = (result.pendingReviewCount > 0 || rubricEvaluations.size > 0) ? "provisional" : "marked";
         const provisionalWrittenScore = [...rubricEvaluations.values()].reduce((sum, item) => sum + item.provisionalMarks, 0);
         Object.assign(result, {
           provisionalWrittenScore,
@@ -311,7 +311,7 @@ export default {
           writtenMarkingNote: "Written-answer marks are AI-generated estimates, not examiner-approved grades."
         });
         const update = await env.DB.prepare(
-          "UPDATE examination_attempts SET status = 'submitted', submitted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), answers_json = ?, result_json = ?, WHERE id = ? AND status = 'in_progress' AND expires_at > ?"
+          "UPDATE examination_attempts SET status = 'submitted', submitted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), answers_json = ?, result_json = ? WHERE id = ? AND status = 'in_progress' AND expires_at > ?"
         ).bind(JSON.stringify(answers), JSON.stringify(result), parsed.value.attemptId, new Date().toISOString()).run();
         if (update.meta.changes !== 1) return response({ error: "This attempt was already submitted or has expired." }, 409, origin, allowed);
         return response({ result }, 200, origin, allowed);
