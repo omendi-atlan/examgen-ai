@@ -71,7 +71,7 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
     assert.equal(response.status, 403);
   });
 
-  it("marks objective answers on the server and flags written answers for review", async () => {
+  it("marks objective answers on the server and returns provisional written marking", async () => {
     const db = seededDb();
     const response = await worker.fetch(request("/api/examinations/attempts/submit", {
       attemptId, answers: { q1: "B", q2: "My explanation" }
@@ -80,7 +80,7 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
     assert.equal(response.status, 200);
     assert.equal(payload.result.objectiveScore, 2);
     assert.equal(payload.result.pendingReviewCount, 1);
-    assert.equal(payload.result.status, "pending_review");
+    assert.equal(payload.result.status, "provisional");
     assert.equal(db.row?.status, "submitted");
   });
 
@@ -101,7 +101,7 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
       }), env);
       const payload = await response.json() as { result: { status: string; provisionalWrittenScore: number; questionResults: Array<{ provisionalMarks?: number; criteria?: Array<{ evidence: string }> }> } };
       assert.equal(response.status, 200);
-      assert.equal(payload.result.status, "pending_review");
+      assert.equal(payload.result.status, "provisional");
       assert.equal(payload.result.provisionalWrittenScore, 2);
       assert.equal(payload.result.questionResults[1].provisionalMarks, 2);
       assert.equal(payload.result.questionResults[1].criteria?.[0].evidence, "The answer identifies the core concept.");
@@ -129,43 +129,9 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
     assert.equal(response.status, 400);
   });
 
-  it("denies examiner queue access without a valid Cloudflare Access identity", async () => {
-    const response = await worker.fetch(new Request("https://worker.test/api/examinations/reviews", {
-      method: "GET", headers: { Origin: ORIGIN }
-    }), makeEnv(seededDb()));
-    assert.equal(response.status, 401);
-  });
-
-  it("accepts a valid signed Cloudflare Access JWT for the examiner queue", async () => {
-    const keys = await crypto.subtle.generateKey(
-      { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
-      true, ["sign", "verify"]
-    );
-    const publicJwk = await crypto.subtle.exportKey("jwk", keys.publicKey);
-    const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "unit-test" })).toString("base64url");
-    const payload = Buffer.from(JSON.stringify({
-      iss: "https://test-team.cloudflareaccess.com", aud: ["aud-tag"],
-      exp: Math.floor(Date.now() / 1000) + 300, email: "examiner@example.com"
-    })).toString("base64url");
-    const signingInput = header + "." + payload;
-    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", keys.privateKey, new TextEncoder().encode(signingInput));
-    const token = signingInput + "." + Buffer.from(signature).toString("base64url");
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response(JSON.stringify({ keys: [{ ...publicJwk, kid: "unit-test" }] }), {
-      status: 200, headers: { "Content-Type": "application/json" }
-    })) as typeof fetch;
-    const env = makeEnv(seededDb());
-    env.ACCESS_TEAM_DOMAIN = "test-team.cloudflareaccess.com";
-    env.ACCESS_AUD = "aud-tag";
-    try {
-      const response = await worker.fetch(new Request("https://worker.test/api/examinations/reviews", {
-        method: "GET", headers: { Origin: ORIGIN, "Cf-Access-Jwt-Assertion": token }
-      }), env);
-      assert.equal(response.status, 200);
-      assert.deepEqual(await response.json(), { reviews: [] });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+  it("does not expose deferred examiner routes", async () => {
+    const response = await worker.fetch(new Request("https://worker.test/examiner"), makeEnv(seededDb()));
+    assert.equal(response.status, 404);
   });
 
   it("does not disclose answer keys from the health endpoint", async () => {
