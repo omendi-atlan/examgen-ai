@@ -19,7 +19,7 @@ The browser never receives the OpenAI credential or generated answer keys. The W
 5. The Worker validates the attempt, checks expiry and status, marks objective and numeric questions, stores answers and result, and conditionally changes the attempt from `in_progress` to `submitted`.
 6. Duplicate or expired submissions are rejected.
 
-Written responses are deliberately reported as pending review. A provisional objective score must not be represented as a final examination mark while written answers remain unmarked.
+Written answers are evaluated against their question-specific rubric by the AI provider. Criterion-level estimates are labelled provisional, never examiner-approved. If AI evaluation fails, the response is clearly identified as unmarked rather than assigned an invented score.
 
 ## Data and security boundaries
 
@@ -34,24 +34,5 @@ Written responses are deliberately reported as pending review. A provisional obj
 
 The roadmap order is fixed: (1) Content ingestion, (2) Subject intelligence, (3) Examination blueprint, (4) Visual intelligence, (5) Question generation, (6) Examination website, (7) Marking and moderation, (8) Question bank, (9) Adaptive learning, and (10) Academic resource production.
 
-Phase 1 focuses on the examination-engine foundations in Modules 3, 5, 6 and 7 without changing this overall sequence.
+Phase 1 focuses on the examination-engine foundations in Modules 3, 5, 6 and 7 without changing this overall sequence. Examiner authentication and moderation workflows are deferred to a later release; no Cloudflare Access audience tags are required for this release.
 
-## Written marking and examiner moderation
-
-- Written answers are evaluated against the question-specific rubric by the configured AI provider.
-- The evaluator returns criterion-level provisional marks, evidence and rationale. Marks are bounded by each criterion's allocation and are never presented as final.
-- If AI evaluation fails, the student submission still completes and the written answer remains in the examiner queue without provisional marks.
-- Submissions with written answers are placed in the D1 moderation queue.
-- Examiner queue, detail and moderation endpoints require a Cloudflare Access JWT. The Worker validates the RS256 signature against the Access JWKS, then checks issuer, audience, expiry and examiner identity.
-- An examiner must provide a final mark for every written question, within its mark allocation. The decision is recorded with examiner identity and timestamp; only then is the result marked final.
-- The examiner interface is served by the Worker at `/examiner` and must be protected by a Cloudflare Access application. Protect the review API path separately; do not protect the whole Worker because student generation and submission routes remain public.
-- In Cloudflare Zero Trust, create self-hosted Access applications for the Worker hostname paths `/examiner` and `/api/examinations/reviews*`. Apply an allow policy restricted to the intended examiner email address(es); do not use an Everyone policy.
-- Protect only those two paths. Do not protect the entire Worker because student generation and submission routes must remain publicly reachable.
-- Set Worker variable `ACCESS_TEAM_DOMAIN` to the Zero Trust team domain (for example, `your-team.cloudflareaccess.com`). Set `ACCESS_AUD` to the comma-separated audience tags for the two Access applications. These are identifiers, not secrets.
-- The examiner page is served at `https://examgen-ai-api.omendi72.workers.dev/examiner`.
-
-## Abuse and request controls
-
-- Generation requests are limited to five per client IP per ten-minute window using D1-backed counters.
-- Client IPs are SHA-256 hashed before persistence; raw IP addresses are not stored in the rate-limit table.
-- Student attempt identifiers remain bearer capabilities until student accounts and ownership controls are introduced.
