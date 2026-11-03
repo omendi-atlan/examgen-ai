@@ -130,7 +130,7 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
   });
 
   it("does not expose deferred examiner routes", async () => {
-    const response = await worker.fetch(new Request("https://worker.test/examiner"), makeEnv(seededDb()));
+    const response = await worker.fetch(new Request("https://worker.test/examiner", { headers: { Origin: ORIGIN } }), makeEnv(seededDb()));
     assert.equal(response.status, 404);
   });
 
