@@ -43,6 +43,14 @@ beforeAll(async () => {
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_attempts_created ON examination_attempts(created_at)").run();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS api_rate_limits (ip_hash TEXT PRIMARY KEY, window_start INTEGER NOT NULL, request_count INTEGER NOT NULL)`).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_api_rate_limits_window ON api_rate_limits(window_start)").run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS marking_reviews (
+    id TEXT PRIMARY KEY, attempt_id TEXT NOT NULL REFERENCES examination_attempts(id) ON DELETE CASCADE,
+    question_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','in_progress','finalised')),
+    marks_awarded REAL, marks_available REAL NOT NULL, criteria_results_json TEXT NOT NULL DEFAULT '[]',
+    feedback TEXT NOT NULL DEFAULT '', marker_label TEXT NOT NULL DEFAULT 'Manual reviewer',
+    finalised_at TEXT, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(attempt_id,question_id)
+  )`).run();
 });
 beforeEach(async () => {
   await env.DB.prepare("DELETE FROM examination_attempts").run();
@@ -88,6 +96,21 @@ describe("Cloudflare Worker + D1 integration", () => {
     expect(JSON.parse(row.answers_json)).toEqual({Q1:"B",Q2:"My explanation"});
     expect(JSON.parse(row.result_json).questionResults[1].status).toBe("pending_manual_review");
     expect(row.submitted_at).toBeTruthy();
+  });
+  it("supports rubric-guided written self-assessment and persists the criteria", async () => {
+    const id="6f8c4b2a-4b6a-4c1e-9f21-123456789abc";
+    await seedAttempt(id);
+    expect((await submit(id,{Q1:"B",Q2:"My explanation"})).status).toBe(200);
+    const response=await worker.fetch(new Request("https://examgen-ai-api.test/api/examinations/attempts/mark-written",{
+      method:"POST",headers:{Origin:ORIGIN,"Content-Type":"application/json"},
+      body:JSON.stringify({attemptId:id,questionId:"Q2",criteria:[{marksAwarded:1}],feedback:"Self-assessment"})
+    }),env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({result:{status:"self_assessed",pendingReviewCount:0,writtenSelfAssessmentScore:1}});
+    const review=await env.DB.prepare("SELECT status,marks_awarded,marker_label FROM marking_reviews WHERE attempt_id = ? AND question_id = ?").bind(id,"Q2").first();
+    expect(review.status).toBe("in_progress");
+    expect(review.marks_awarded).toBe(1);
+    expect(review.marker_label).toContain("Self-assessment");
   });
   it("rejects a second submission", async () => {
     const id="8f8c4b2a-4b6a-4c1e-9f21-123456789abc";
