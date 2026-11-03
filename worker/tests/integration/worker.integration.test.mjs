@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { env, SELF, fetchMock } from "cloudflare:test";
+import { env, fetchMock } from "cloudflare:test";
+import worker from "../../src/index";
 
 const ORIGIN = "https://omendi-atlan.github.io";
 const future = () => new Date(Date.now() + 60_000).toISOString();
@@ -24,10 +25,10 @@ async function seedAttempt(id, status = "in_progress", expiresAt = future()) {
 }
 
 async function submit(id, answers) {
-  return SELF.fetch("https://examgen-ai-api.test/api/examinations/attempts/submit", {
+  return worker.fetch(new Request("https://examgen-ai-api.test/api/examinations/attempts/submit", {
     method: "POST", headers: { Origin: ORIGIN, "Content-Type": "application/json" },
     body: JSON.stringify({ attemptId: id, answers })
-  });
+  }), env);
 }
 
 beforeAll(async () => {
@@ -81,28 +82,28 @@ beforeEach(async () => {
 
 describe("Cloudflare Worker + D1 integration", () => {
   it("serves health from the Workers runtime", async () => {
-    const response = await SELF.fetch("https://examgen-ai-api.test/health", { headers: { Origin: ORIGIN } });
+    const response = await worker.fetch(new Request("https://examgen-ai-api.test/health", { headers: { Origin: ORIGIN } }), env);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: "ok", database: "configured" });
   });
 
   it("rejects generation when the client IP header is missing", async () => {
-    const response = await SELF.fetch("https://examgen-ai-api.test/api/examinations/generate", {
+    const response = await worker.fetch(new Request("https://examgen-ai-api.test/api/examinations/generate", {
       method: "POST",
       headers: { Origin: ORIGIN, "Content-Type": "application/json" },
       body: JSON.stringify({ subject: "Computing", topics: ["Networks"], totalMarks: 5, durationMinutes: 30, mode: "practice", difficulty: "balanced" })
-    });
+    }), env);
     expect(response.status).toBe(429);
     const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM api_rate_limits").first();
     expect(count.count).toBe(0);
   });
 
   it("allows five generations per IP in a ten-minute window and blocks the sixth", async () => {
-    const makeRequest = () => SELF.fetch("https://examgen-ai-api.test/api/examinations/generate", {
+    const makeRequest = () => worker.fetch(new Request("https://examgen-ai-api.test/api/examinations/generate", {
       method: "POST",
       headers: { Origin: ORIGIN, "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.77" },
       body: JSON.stringify({ subject: "Computing", topics: ["Networks"], totalMarks: 5, durationMinutes: 30, mode: "practice", difficulty: "balanced" })
-    });
+    }), env);
     for (let i = 0; i < 5; i++) {
       const response = await makeRequest();
       expect(response.status).toBe(201);
@@ -116,6 +117,10 @@ describe("Cloudflare Worker + D1 integration", () => {
     expect(row.request_count).toBe(6);
     const attempts = await env.DB.prepare("SELECT COUNT(*) AS count FROM examination_attempts").first();
     expect(attempts.count).toBe(5);
+    await env.DB.prepare("UPDATE api_rate_limits SET window_start = 0").run();
+    expect((await makeRequest()).status).toBe(201);
+    const reset = await env.DB.prepare("SELECT request_count FROM api_rate_limits").first();
+    expect(reset.request_count).toBe(1);
   });
 
   it("persists a submitted attempt and returns objective marking plus AI provisional written marking", async () => {
