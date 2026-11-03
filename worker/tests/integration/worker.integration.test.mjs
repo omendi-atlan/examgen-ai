@@ -74,9 +74,10 @@ describe("Cloudflare Worker + D1 integration", () => {
       status: "pending_review", objectiveScore: 1, autoMarkTotal: 1, pendingReviewCount: 1
     }});
     const row = await env.DB.prepare(
-      "SELECT status, answers_json, result_json, submitted_at FROM examination_attempts WHERE id = ?"
+      "SELECT status, review_status, answers_json, result_json, submitted_at FROM examination_attempts WHERE id = ?"
     ).bind(id).first();
     expect(row.status).toBe("submitted");
+    expect(row.review_status).toBe("pending");
     expect(JSON.parse(row.answers_json)).toEqual({ Q1: "B", Q2: "My explanation" });
     expect(JSON.parse(row.result_json).objectiveScore).toBe(1);
     expect(row.submitted_at).toBeTruthy();
