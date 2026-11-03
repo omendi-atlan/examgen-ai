@@ -13,8 +13,6 @@ export interface Env {
   OPENAI_MODEL?: string;
   ALLOWED_ORIGIN?: string;
   DB: D1Database;
-  ACCESS_TEAM_DOMAIN?: string;
-  ACCESS_AUD?: string;
 }
 
 type QuestionType = "multiple_choice" | "dropdown" | "short_answer" | "long_answer" | "numeric";
@@ -139,7 +137,7 @@ function markAttempt(exam: GeneratedExam, answers: Record<string, unknown>) {
     const submitted = typeof answers[question.id] === "string" ? (answers[question.id] as string).slice(0, 10_000) : "";
     const autoMarkable = question.type === "multiple_choice" || question.type === "dropdown" || question.type === "numeric";
     if (!autoMarkable) {
-      return { questionId: question.id, marksAvailable: question.marks, marksAwarded: null, status: "pending_review", explanation: null };
+      return { questionId: question.id, marksAvailable: question.marks, marksAwarded: null, status: "awaiting_ai_mark", explanation: null };
     }
     const correct = question.type === "numeric"
       ? submitted.trim() !== "" && Number.isFinite(Number(submitted)) && Number(submitted) === Number(question.answer)
@@ -153,11 +151,11 @@ function markAttempt(exam: GeneratedExam, answers: Record<string, unknown>) {
     };
   });
   const autoMarked = questionResults.filter((item) => item.marksAwarded !== null);
-  const pendingReview = questionResults.filter((item) => item.status === "pending_review");
+  const pendingReview = questionResults.filter((item) => item.status === "awaiting_ai_mark");
   const objectiveScore = autoMarked.reduce((sum, item) => sum + (item.marksAwarded ?? 0), 0);
   const autoMarkTotal = autoMarked.reduce((sum, item) => sum + item.marksAvailable, 0);
   return {
-    status: pendingReview.length ? "pending_review" : "marked",
+    status: pendingReview.length ? "provisional" : "marked",
     objectiveScore,
     autoMarkTotal,
     totalMarks: exam.totalMarks,
@@ -228,43 +226,6 @@ async function evaluateWrittenAnswers(exam: GeneratedExam, answers: Record<strin
   return evaluations;
 }
 
-type AccessClaims = { iss?: string; aud?: string[] | string; exp?: number; nbf?: number; email?: string; sub?: string };
-
-function decodeBase64Url(value: string): Uint8Array {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-async function authenticateExaminer(request: Request, env: Env): Promise<{ email: string } | null> {
-  const domain = env.ACCESS_TEAM_DOMAIN?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const audiences = env.ACCESS_AUD?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
-  const token = request.headers.get("Cf-Access-Jwt-Assertion");
-  if (!domain || !/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain) || !audiences.length || !token) return null;
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0]))) as { alg?: string; kid?: string };
-    const claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1]))) as AccessClaims;
-    if (header.alg !== "RS256" || !header.kid || claims.iss !== `https://${domain}` ||
-        !(Array.isArray(claims.aud) ? claims.aud.some((value) => audiences.includes(value)) : typeof claims.aud === "string" && audiences.includes(claims.aud)) ||
-        typeof claims.exp !== "number" || claims.exp <= Date.now() / 1000 ||
-        (typeof claims.nbf === "number" && claims.nbf > Date.now() / 1000) ||
-        typeof claims.email !== "string" || !claims.email.includes("@")) return null;
-    const keyResponse = await fetch(`https://${domain}/cdn-cgi/access/certs`);
-    if (!keyResponse.ok) return null;
-    const keySet = await keyResponse.json() as { keys?: JsonWebKey[] };
-    const jwk = keySet.keys?.find((key) => (key as JsonWebKey & { kid?: string }).kid === header.kid);
-    if (!jwk) return null;
-    const publicKey = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
-    const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey,
-      decodeBase64Url(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
-    return valid ? { email: claims.email } : null;
-  } catch {
-    return null;
-  }
-}
-
 async function allowGeneration(request: Request, env: Env): Promise<boolean> {
   const clientIp = request.headers.get("CF-Connecting-IP");
   if (!clientIp) return false;
@@ -288,25 +249,6 @@ async function readJson(request: Request): Promise<{ value?: unknown; error?: st
   catch { return { error: "Request body must be valid JSON." }; }
 }
 
-const EXAMINER_HTML = String.raw`<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>EXAMGEN AI · Examiner moderation</title>
-<style>
-:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#090d14;color:#eef2f7}
-body{margin:0;padding:32px 18px}.shell{max-width:1000px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #293241;padding-bottom:20px}.brand{font-weight:800;letter-spacing:.08em}.brand b{color:#f97316}.muted{color:#aab5c4}.panel{background:#111925;border:1px solid #293241;border-radius:16px;padding:22px;margin-top:18px}.item,.question{border:1px solid #293241;border-radius:12px;padding:16px;margin:12px 0}.item{display:flex;justify-content:space-between;align-items:center;gap:12px}.btn{background:#f97316;color:#111;border:0;border-radius:9px;padding:11px 16px;font-weight:750;cursor:pointer}.secondary{background:#273449;color:#eef2f7}.btn:disabled{opacity:.5;cursor:not-allowed}input{background:#0b111a;border:1px solid #445064;border-radius:8px;padding:10px;color:white;width:100px}label{display:block;margin:12px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.rubric{background:#0b111a;padding:12px;border-radius:8px;margin-top:10px}.error{color:#fca5a5}.good{color:#86efac}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:650px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
-</style></head><body><main class="shell"><header class="top"><div><div class="brand">EXAMGEN <b>AI</b></div><h1>Examiner moderation</h1><p class="muted">Review AI-assisted marking and record final examiner decisions.</p></div><button class="btn secondary" onclick="loadQueue()">Refresh queue</button></header>
-<section class="panel"><h2>Pending written assessments</h2><div id="queue" class="muted">Loading review queue…</div></section>
-<section id="detail" class="panel" hidden><h2 id="review-title">Review submission</h2><p id="review-meta" class="muted"></p><div id="questions"></div><button id="finalise" class="btn" onclick="finaliseReview()">Approve final marks</button><p id="message" class="muted"></p></section>
-</main><script>
-var current=null, writtenQuestions=[];
-function esc(value){return String(value==null?"":value).replace(/[&<>"']/g,function(c){return c==="&"?"&amp;":c==="<"?"&lt;":c===">"?"&gt;":c==='"'?"&quot;":"&#39;"})}
-async function api(path,options){var response=await fetch(path,Object.assign({credentials:"same-origin"},options||{}));var data=await response.json().catch(function(){return {error:"Unexpected server response."}});if(!response.ok)throw new Error(data.error||"Request failed ("+response.status+")");return data}
-async function loadQueue(){var target=document.getElementById("queue");target.textContent="Loading…";try{var data=await api("/api/examinations/reviews");if(!data.reviews.length){target.textContent="No written submissions are awaiting moderation.";return}target.innerHTML=data.reviews.map(function(item){return '<div class="item"><div><b>'+esc(item.subject)+'</b><div class="muted">'+esc(item.mode)+' · Submitted '+esc(item.submitted_at||"")+'</div><small class="muted">'+esc(item.id)+'</small></div><button class="btn" data-review-id="'+esc(item.id)+'">Review</button></div>'}).join("");target.querySelectorAll("[data-review-id]").forEach(function(button){button.addEventListener("click",function(){openReview(button.getAttribute("data-review-id"))})})}catch(error){target.innerHTML='<p class="error">'+esc(error.message)+'</p>'}}
-async function openReview(id){try{var data=await api("/api/examinations/reviews/"+encodeURIComponent(id));current=data.review;writtenQuestions=current.exam.questions.filter(function(q){return q.type==="short_answer"||q.type==="long_answer"});document.getElementById("review-title").textContent=current.exam.title;document.getElementById("review-meta").textContent=current.subject+" · "+current.mode+" · "+current.submittedAt;var results=current.result.questionResults||[];document.getElementById("questions").innerHTML=writtenQuestions.map(function(q,index){var answer=current.answers[q.id]||"";var result=results.find(function(r){return r.questionId===q.id})||{};var criteria=(q.rubric&&q.rubric.criteria)||[];var ai=(result.criteria||[]).map(function(c){return '<div class="rubric"><b>'+esc(c.criterion)+' · AI '+esc(c.marksAwarded)+'/'+esc(c.marksAvailable)+'</b><p>Evidence: '+esc(c.evidence)+'</p><p>'+esc(c.rationale)+'</p></div>'}).join("");var rubric=criteria.map(function(c){return '<div class="rubric"><b>'+esc(c.criterion)+' · '+esc(c.marks)+' marks</b><p>Full: '+esc(c.descriptors.full)+'</p><p>Partial: '+esc(c.descriptors.partial)+'</p><p>None: '+esc(c.descriptors.none)+'</p></div>'}).join("");return '<article class="question"><h3>Question '+(index+1)+' · '+esc(q.marks)+' marks</h3><p>'+esc(q.prompt)+'</p><h4>Student response</h4><pre>'+esc(answer)+'</pre><h4>Model answer / marking guidance</h4><pre>'+esc(q.answer)+'</pre><h4>Rubric</h4>'+rubric+(ai?'<h4>AI provisional assessment</h4>'+ai:'<p class="muted">No AI provisional assessment was available. Mark manually using the rubric.</p>')+'<label>Final examiner mark (0–'+esc(q.marks)+')<br><input type="number" id="mark-'+index+'" min="0" max="'+esc(q.marks)+'" step="1" value="'+esc(result.provisionalMarks==null?"":result.provisionalMarks)+'" required></label></article>'}).join("");document.getElementById("detail").hidden=false;document.getElementById("message").textContent="AI marks are advisory only. Your submitted marks become the final written marks.";document.getElementById("detail").scrollIntoView({behavior:"smooth"})}catch(error){alert(error.message)}}
-async function finaliseReview(){if(!current)return;var marks={};for(var i=0;i<writtenQuestions.length;i++){var q=writtenQuestions[i],input=document.getElementById("mark-"+i),value=Number(input.value);if(input.value===""||!Number.isInteger(value)||value<0||value>q.marks){document.getElementById("message").innerHTML='<span class="error">Enter a valid whole-number mark for every written question.</span>';input.focus();return}marks[q.id]=value}var button=document.getElementById("finalise");button.disabled=true;try{var data=await api("/api/examinations/reviews/moderate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({attemptId:current.id,questionMarks:marks})});document.getElementById("message").innerHTML='<span class="good">Final mark recorded: '+esc(data.result.finalScore)+' / '+esc(data.result.totalMarks)+'. Moderated by '+esc(data.result.moderation.moderatedBy)+'.</span>';button.hidden=true;await loadQueue()}catch(error){document.getElementById("message").innerHTML='<span class="error">'+esc(error.message)+'</span>';button.disabled=false}}
-loadQueue();
-</script></body></html>`;
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get("Origin") ?? "";
@@ -326,96 +268,6 @@ export default {
       return response({ status: "ok", service: "examgen-ai-api", database: "configured" }, 200, origin, allowed);
     }
     if (origin !== allowed) return response({ error: "Origin not allowed." }, 403);
-
-    if (url.pathname === "/examiner" && request.method === "GET") {
-      const examiner = await authenticateExaminer(request, env);
-      if (!examiner) return response({ error: "Examiner authentication is required." }, 401, origin, allowed);
-      return new Response(EXAMINER_HTML, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-store",
-          "X-Content-Type-Options": "nosniff",
-          "Referrer-Policy": "no-referrer",
-          "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-        }
-      });
-    }
-
-    if (url.pathname.startsWith("/api/examinations/reviews")) {
-      const examiner = await authenticateExaminer(request, env);
-      if (!examiner) return response({ error: "Examiner authentication is required." }, 401, origin, allowed);
-
-      if (url.pathname === "/api/examinations/reviews" && request.method === "GET") {
-        try {
-          const rows = await env.DB.prepare(
-            "SELECT id, mode, subject, created_at, submitted_at FROM examination_attempts WHERE review_status = 'pending' ORDER BY submitted_at ASC LIMIT 100"
-          ).all<{ id: string; mode: string; subject: string; created_at: string; submitted_at: string }>();
-          return response({ reviews: rows.results ?? [] }, 200, origin, allowed);
-        } catch {
-          return response({ error: "The examiner queue could not be loaded." }, 500, origin, allowed);
-        }
-      }
-
-      const detailMatch = url.pathname.match(/^\/api\/examinations\/reviews\/([0-9a-f-]{36})$/i);
-      if (detailMatch && request.method === "GET") {
-        try {
-          const row = await env.DB.prepare(
-            "SELECT id, mode, subject, exam_json, answers_json, result_json, submitted_at FROM examination_attempts WHERE id = ? AND review_status = 'pending'"
-          ).bind(detailMatch[1]).first<{ id: string; mode: string; subject: string; exam_json: string; answers_json: string | null; result_json: string; submitted_at: string }>();
-          if (!row) return response({ error: "Review item not found." }, 404, origin, allowed);
-          return response({ review: { id: row.id, mode: row.mode, subject: row.subject, submittedAt: row.submitted_at,
-            exam: JSON.parse(row.exam_json), answers: JSON.parse(row.answers_json ?? "{}"), result: JSON.parse(row.result_json) } }, 200, origin, allowed);
-        } catch {
-          return response({ error: "The review item could not be loaded." }, 500, origin, allowed);
-        }
-      }
-
-      if (url.pathname === "/api/examinations/reviews/moderate" && request.method === "POST") {
-        const parsed = await readJson(request);
-        if (parsed.error) return response({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400, origin, allowed);
-        if (!isRecord(parsed.value) || typeof parsed.value.attemptId !== "string" ||
-            !/^[0-9a-f-]{36}$/i.test(parsed.value.attemptId) || !isRecord(parsed.value.questionMarks)) {
-          return response({ error: "A valid attemptId and questionMarks object are required." }, 400, origin, allowed);
-        }
-        try {
-          const row = await env.DB.prepare(
-            "SELECT exam_json, result_json FROM examination_attempts WHERE id = ? AND review_status = 'pending'"
-          ).bind(parsed.value.attemptId).first<{ exam_json: string; result_json: string }>();
-          if (!row) return response({ error: "Review item not found or already moderated." }, 404, origin, allowed);
-          const exam = JSON.parse(row.exam_json) as GeneratedExam;
-          const written = exam.questions.filter((q) => q.type === "short_answer" || q.type === "long_answer");
-          const supplied = parsed.value.questionMarks;
-          const writtenIds = new Set(written.map((q) => q.id));
-          if (Object.keys(supplied).length !== written.length ||
-              Object.keys(supplied).some((id) => !writtenIds.has(id)) ||
-              written.some((q) => !Number.isInteger(supplied[q.id]) || Number(supplied[q.id]) < 0 || Number(supplied[q.id]) > q.marks)) {
-            return response({ error: "Provide a valid final mark for every written question, within its mark allocation." }, 400, origin, allowed);
-          }
-          const result = JSON.parse(row.result_json) as {
-            objectiveScore: number; questionResults: Array<Record<string, unknown>>;
-          };
-          let writtenScore = 0;
-          for (const q of written) {
-            const mark = Number(supplied[q.id]);
-            writtenScore += mark;
-            const questionResult = result.questionResults.find((item) => item.questionId === q.id);
-            if (questionResult) Object.assign(questionResult, { marksAwarded: mark, status: "moderated", moderatedBy: examiner.email });
-          }
-          const finalScore = result.objectiveScore + writtenScore;
-          const moderation = { writtenScore, finalScore, totalMarks: exam.totalMarks, moderatedBy: examiner.email };
-          const updatedResult = { ...result, writtenScore, finalScore, status: "marked", pendingReviewCount: 0, moderation };
-          const update = await env.DB.prepare(
-            "UPDATE examination_attempts SET review_status = 'approved', moderation_json = ?, moderated_by = ?, moderated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), result_json = ? WHERE id = ? AND review_status = 'pending'"
-          ).bind(JSON.stringify(moderation), examiner.email, JSON.stringify(updatedResult), parsed.value.attemptId).run();
-          if (update.meta.changes !== 1) return response({ error: "This review item was already moderated." }, 409, origin, allowed);
-          return response({ result: updatedResult }, 200, origin, allowed);
-        } catch {
-          return response({ error: "The examiner decision could not be saved." }, 500, origin, allowed);
-        }
-      }
-      return response({ error: "Not found." }, 404, origin, allowed);
-    }
 
     if (url.pathname === "/api/examinations/attempts/submit" && request.method === "POST") {
       const parsed = await readJson(request);
@@ -448,17 +300,19 @@ export default {
         const rubricEvaluations = await evaluateWrittenAnswers(exam, answers, env);
         for (const questionResult of result.questionResults) {
           const evaluation = rubricEvaluations.get(questionResult.questionId);
-          if (evaluation) Object.assign(questionResult, evaluation);
+          if (evaluation) Object.assign(questionResult, evaluation, { status: "provisionally_marked" });
         }
+        result.pendingReviewCount = Math.max(0, result.pendingReviewCount - rubricEvaluations.size);
+        result.status = result.pendingReviewCount > 0 ? "provisional" : "marked";
         const provisionalWrittenScore = [...rubricEvaluations.values()].reduce((sum, item) => sum + item.provisionalMarks, 0);
         Object.assign(result, {
           provisionalWrittenScore,
           rubricEvaluationCount: rubricEvaluations.size,
-          writtenMarkingNote: "AI-suggested written marks are provisional and require examiner moderation."
+          writtenMarkingNote: "Written-answer marks are AI-generated estimates, not examiner-approved grades."
         });
         const update = await env.DB.prepare(
-          "UPDATE examination_attempts SET status = 'submitted', submitted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), answers_json = ?, result_json = ?, review_status = CASE WHEN ? > 0 THEN 'pending' ELSE 'not_required' END WHERE id = ? AND status = 'in_progress' AND expires_at > ?"
-        ).bind(JSON.stringify(answers), JSON.stringify(result), result.pendingReviewCount, parsed.value.attemptId, new Date().toISOString()).run();
+          "UPDATE examination_attempts SET status = 'submitted', submitted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), answers_json = ?, result_json = ?, WHERE id = ? AND status = 'in_progress' AND expires_at > ?"
+        ).bind(JSON.stringify(answers), JSON.stringify(result), parsed.value.attemptId, new Date().toISOString()).run();
         if (update.meta.changes !== 1) return response({ error: "This attempt was already submitted or has expired." }, 409, origin, allowed);
         return response({ result }, 200, origin, allowed);
       } catch {
