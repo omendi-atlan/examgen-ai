@@ -1,8 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { env, SELF } from "cloudflare:test";
+import { env, SELF, fetchMock } from "cloudflare:test";
 
 const ORIGIN = "https://omendi-atlan.github.io";
 const future = () => new Date(Date.now() + 60_000).toISOString();
+const generatedExam = {
+  title: "Rate limit assessment", subject: "Computing", durationMinutes: 30,
+  totalMarks: 5, instructions: ["Answer all questions."], questions: [
+    { id: "R1", section: "A", prompt: "Choose the correct option.", type: "multiple_choice", marks: 5, difficulty: "foundation", options: ["A", "B", "C", "D"], answer: "B", explanation: "B is correct." }
+  ]
+};
 const exam = {
   title: "Integration assessment", subject: "Project Management", durationMinutes: 30,
   totalMarks: 3, instructions: ["Answer all questions."], questions: [
@@ -51,7 +57,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await env.DB.prepare("DELETE FROM examination_attempts").run();
+  await env.DB.prepare("DELETE FROM examination_attempts").run();\n  await env.DB.prepare("DELETE FROM api_rate_limits").run();
 });
 
 describe("Cloudflare Worker + D1 integration", () => {
@@ -59,6 +65,38 @@ describe("Cloudflare Worker + D1 integration", () => {
     const response = await SELF.fetch("https://examgen-ai-api.test/health", { headers: { Origin: ORIGIN } });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ status: "ok", database: "configured" });
+  });
+
+  it("rejects generation when the client IP header is missing", async () => {
+    const response = await SELF.fetch("https://examgen-ai-api.test/api/examinations/generate", {
+      method: "POST",
+      headers: { Origin: ORIGIN, "Content-Type": "application/json" },
+      body: JSON.stringify({ subject: "Computing", topics: ["Networks"], totalMarks: 5, durationMinutes: 30, mode: "practice", difficulty: "balanced" })
+    });
+    expect(response.status).toBe(429);
+    const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM api_rate_limits").first();
+    expect(count.count).toBe(0);
+  });
+
+  it("allows five generations per IP in a ten-minute window and blocks the sixth", async () => {
+    const makeRequest = () => SELF.fetch("https://examgen-ai-api.test/api/examinations/generate", {
+      method: "POST",
+      headers: { Origin: ORIGIN, "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.77" },
+      body: JSON.stringify({ subject: "Computing", topics: ["Networks"], totalMarks: 5, durationMinutes: 30, mode: "practice", difficulty: "balanced" })
+    });
+    for (let i = 0; i < 5; i++) {
+      const response = await makeRequest();
+      expect(response.status).toBe(201);
+      const payload = await response.json();
+      expect(payload.exam.questions[0]).not.toHaveProperty("answer");
+      expect(payload.exam.questions[0]).not.toHaveProperty("explanation");
+    }
+    const blocked = await makeRequest();
+    expect(blocked.status).toBe(429);
+    const row = await env.DB.prepare("SELECT request_count FROM api_rate_limits").first();
+    expect(row.request_count).toBe(6);
+    const attempts = await env.DB.prepare("SELECT COUNT(*) AS count FROM examination_attempts").first();
+    expect(attempts.count).toBe(5);
   });
 
   it("persists a submitted attempt and returns objective marking plus AI provisional written marking", async () => {
