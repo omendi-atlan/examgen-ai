@@ -40,10 +40,6 @@ beforeAll(async () => {
       submitted_at TEXT,
       answers_json TEXT,
       result_json TEXT,
-      review_status TEXT NOT NULL DEFAULT 'not_required',
-      moderation_json TEXT,
-      moderated_by TEXT,
-      moderated_at TEXT
     )
   `).run();
   await env.DB.prepare(
@@ -65,13 +61,13 @@ describe("Cloudflare Worker + D1 integration", () => {
     expect(await response.json()).toMatchObject({ status: "ok", database: "configured" });
   });
 
-  it("persists a submitted attempt and returns objective marking plus written review status", async () => {
+  it("persists a submitted attempt and returns objective marking plus AI provisional written marking", async () => {
     const id = "7f8c4b2a-4b6a-4c1e-9f21-123456789abc";
     await seedAttempt(id);
     const response = await submit(id, { Q1: "B", Q2: "My explanation" });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ result: {
-      status: "pending_review", objectiveScore: 1, autoMarkTotal: 1, pendingReviewCount: 1
+      status: "provisional", objectiveScore: 1, autoMarkTotal: 1, pendingReviewCount: 1
     }});
     const row = await env.DB.prepare(
       "SELECT status, review_status, answers_json, result_json, submitted_at FROM examination_attempts WHERE id = ?"
