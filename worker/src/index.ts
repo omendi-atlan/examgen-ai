@@ -88,7 +88,12 @@ export default {
 
     if (request.method === "OPTIONS") {
       if (origin !== allowed) return response({ error: "Origin not allowed." }, 403);
-      return response({}, 204, origin, allowed);
+      const headers = new Headers();
+      headers.set("Access-Control-Allow-Origin", origin);
+      headers.set("Access-Control-Allow-Methods", "POST, OPTIONS, GET");
+      headers.set("Access-Control-Allow-Headers", "Content-Type");
+      headers.set("Vary", "Origin");
+      return new Response(null, { status: 204, headers });
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
