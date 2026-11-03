@@ -403,7 +403,7 @@ export default {
       }
 
       const attemptId = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + Number(durationMinutes) * 60_000).toISOString();
+      const expiresAt = new Date(Date.now() + (Number(durationMinutes) * 60_000) + 120_000).toISOString();
       await env.DB.prepare(
         "INSERT INTO examination_attempts (id, mode, subject, exam_json, expires_at) VALUES (?, ?, ?, ?, ?)"
       ).bind(attemptId, mode, subject, JSON.stringify(exam), expiresAt).run();
