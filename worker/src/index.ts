@@ -124,7 +124,7 @@ function markAttempt(exam: Exam, answers: Record<string, unknown>) {
   const questionResults = exam.questions.map((q) => {
     const submitted = typeof answers[q.id] === "string" ? String(answers[q.id]).slice(0, 10_000) : "";
     const objective = q.type === "multiple_choice" || q.type === "dropdown" || q.type === "numeric";
-    if (!objective) return { questionId: q.id, marksAvailable: q.marks, marksAwarded: null, status: "pending_manual_review", explanation: null };
+    if (!objective) return { questionId: q.id, marksAvailable: q.marks, marksAwarded: null, status: "pending_manual_review", explanation: null, rubric: q.rubric ?? null };
     const correct = q.type === "numeric"
       ? submitted.trim() !== "" && Number.isFinite(Number(submitted)) &&
         Math.abs(Number(submitted) - Number(q.answer)) <= (q.numericTolerance ?? 0)
@@ -222,6 +222,55 @@ export default {
         return response({ result }, 200, origin, allowed);
       } catch {
         return response({ error: "The examination could not be submitted. Please retry." }, 500, origin, allowed);
+      }
+    }
+    if (url.pathname === "/api/examinations/attempts/mark-written" && request.method === "POST") {
+      const parsed = await readJson(request);
+      if (parsed.error) return response({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400, origin, allowed);
+      if (!isRecord(parsed.value) || typeof parsed.value.attemptId !== "string" || !UUID.test(parsed.value.attemptId) ||
+          typeof parsed.value.questionId !== "string" || !Array.isArray(parsed.value.criteria) ||
+          (parsed.value.feedback !== undefined && (typeof parsed.value.feedback !== "string" || parsed.value.feedback.length > 4000))) {
+        return response({ error: "A valid attemptId, questionId, criteria array and optional feedback are required." }, 400, origin, allowed);
+      }
+      try {
+        const row = await env.DB.prepare("SELECT exam_json, result_json, status FROM examination_attempts WHERE id = ?")
+          .bind(parsed.value.attemptId).first<{ exam_json: string; result_json: string; status: string }>();
+        if (!row) return response({ error: "Examination attempt not found." }, 404, origin, allowed);
+        if (row.status !== "submitted") return response({ error: "Only submitted attempts can be self-assessed." }, 409, origin, allowed);
+        const exam = JSON.parse(row.exam_json) as Exam;
+        const question = exam.questions.find((q) => q.id === parsed.value.questionId);
+        if (!question || (question.type !== "short_answer" && question.type !== "long_answer") || !question.rubric) {
+          return response({ error: "The selected question does not have a written-answer rubric." }, 400, origin, allowed);
+        }
+        if (parsed.value.criteria.length !== question.rubric.criteria.length) return response({ error: "Every rubric criterion must receive a mark." }, 400, origin, allowed);
+        const criteriaResults: Array<{criterion:string;marksAvailable:number;marksAwarded:number;descriptor:string}> = [];
+        for (let i = 0; i < question.rubric.criteria.length; i++) {
+          const submitted = parsed.value.criteria[i];
+          const criterion = question.rubric.criteria[i];
+          if (!isRecord(submitted) || !Number.isInteger(submitted.marksAwarded) ||
+              Number(submitted.marksAwarded) < 0 || Number(submitted.marksAwarded) > criterion.marks) {
+            return response({ error: "A rubric mark is outside its permitted range." }, 400, origin, allowed);
+          }
+          criteriaResults.push({ criterion: criterion.criterion, marksAvailable: criterion.marks,
+            marksAwarded: Number(submitted.marksAwarded), descriptor: Number(submitted.marksAwarded) === criterion.marks ? criterion.descriptors.full : Number(submitted.marksAwarded) === 0 ? criterion.descriptors.none : criterion.descriptors.partial });
+        }
+        const result = JSON.parse(row.result_json) as Record<string, unknown>;
+        const questionResults = Array.isArray(result.questionResults) ? result.questionResults as Array<Record<string, unknown>> : [];
+        const target = questionResults.find((item) => item.questionId === question.id);
+        if (!target) return response({ error: "The submitted question result could not be found." }, 409, origin, allowed);
+        const marksAwarded = criteriaResults.reduce((sum, item) => sum + item.marksAwarded, 0);
+        Object.assign(target, { marksAwarded, status: "self_assessed", criteriaResults });
+        const pendingReviewCount = questionResults.filter((item) => item.status === "pending_manual_review").length;
+        const writtenSelfAssessmentScore = questionResults.filter((item) => item.status === "self_assessed")
+          .reduce((sum, item) => sum + Number(item.marksAwarded ?? 0), 0);
+        Object.assign(result, { pendingReviewCount, writtenSelfAssessmentScore, status: pendingReviewCount ? "provisional" : "self_assessed" });
+        await env.DB.prepare("UPDATE examination_attempts SET result_json = ? WHERE id = ? AND status = 'submitted'")
+          .bind(JSON.stringify(result), parsed.value.attemptId).run();
+        await env.DB.prepare("INSERT INTO marking_reviews (id, attempt_id, question_id, status, marks_awarded, marks_available, criteria_results_json, feedback, marker_label) VALUES (?, ?, ?, 'in_progress', ?, ?, ?, ?, 'Self-assessment (not examiner-approved)') ON CONFLICT(attempt_id, question_id) DO UPDATE SET status = 'in_progress', marks_awarded = excluded.marks_awarded, criteria_results_json = excluded.criteria_results_json, feedback = excluded.feedback, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')")
+          .bind(crypto.randomUUID(), parsed.value.attemptId, question.id, marksAwarded, question.marks, JSON.stringify(criteriaResults), String(parsed.value.feedback ?? "")).run();
+        return response({ result, note: "Self-assessment is for personal learning and is not an examiner-approved final mark." }, 200, origin, allowed);
+      } catch {
+        return response({ error: "The written response could not be self-assessed. Please retry." }, 500, origin, allowed);
       }
     }
     return response({ error: "Not found." }, 404, origin, allowed);
