@@ -238,16 +238,16 @@ function decodeBase64Url(value: string): Uint8Array {
 
 async function authenticateExaminer(request: Request, env: Env): Promise<{ email: string } | null> {
   const domain = env.ACCESS_TEAM_DOMAIN?.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
-  const audience = env.ACCESS_AUD?.trim();
+  const audiences = env.ACCESS_AUD?.split(",").map((value) => value.trim()).filter(Boolean) ?? [];
   const token = request.headers.get("Cf-Access-Jwt-Assertion");
-  if (!domain || !/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain) || !audience || !token) return null;
+  if (!domain || !/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain) || !audiences.length || !token) return null;
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
     const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0]))) as { alg?: string; kid?: string };
     const claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1]))) as AccessClaims;
     if (header.alg !== "RS256" || !header.kid || claims.iss !== `https://${domain}` ||
-        !(Array.isArray(claims.aud) ? claims.aud.includes(audience) : claims.aud === audience) ||
+        !(Array.isArray(claims.aud) ? claims.aud.some((value) => audiences.includes(value)) : typeof claims.aud === "string" && audiences.includes(claims.aud)) ||
         typeof claims.exp !== "number" || claims.exp <= Date.now() / 1000 ||
         (typeof claims.nbf === "number" && claims.nbf > Date.now() / 1000) ||
         typeof claims.email !== "string" || !claims.email.includes("@")) return null;
