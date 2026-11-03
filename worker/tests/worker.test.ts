@@ -21,6 +21,7 @@ class FakeStatement {
   constructor(private readonly db: FakeD1, private readonly sql: string) {}
   bind(...values: unknown[]) { this.values = values; return this; }
   async first<T>() { return (this.db.row as T | null) ?? null; }
+  async all<T>() { return { results: [] as T[] }; }
   async run() {
     if (this.sql.includes("INSERT INTO examination_attempts")) {
       this.db.row = { exam_json: String(this.values[3]), status: "in_progress", expires_at: String(this.values[4]) };
@@ -133,6 +134,38 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
       method: "GET", headers: { Origin: ORIGIN }
     }), makeEnv(seededDb()));
     assert.equal(response.status, 401);
+  });
+
+  it("accepts a valid signed Cloudflare Access JWT for the examiner queue", async () => {
+    const keys = await crypto.subtle.generateKey(
+      { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+      true, ["sign", "verify"]
+    );
+    const publicJwk = await crypto.subtle.exportKey("jwk", keys.publicKey);
+    const header = Buffer.from(JSON.stringify({ alg: "RS256", kid: "unit-test" })).toString("base64url");
+    const payload = Buffer.from(JSON.stringify({
+      iss: "https://test-team.cloudflareaccess.com", aud: ["aud-tag"],
+      exp: Math.floor(Date.now() / 1000) + 300, email: "examiner@example.com"
+    })).toString("base64url");
+    const signingInput = header + "." + payload;
+    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", keys.privateKey, new TextEncoder().encode(signingInput));
+    const token = signingInput + "." + Buffer.from(signature).toString("base64url");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify({ keys: [{ ...publicJwk, kid: "unit-test" }] }), {
+      status: 200, headers: { "Content-Type": "application/json" }
+    })) as typeof fetch;
+    const env = makeEnv(seededDb());
+    env.ACCESS_TEAM_DOMAIN = "test-team.cloudflareaccess.com";
+    env.ACCESS_AUD = "aud-tag";
+    try {
+      const response = await worker.fetch(new Request("https://worker.test/api/examinations/reviews", {
+        method: "GET", headers: { Origin: ORIGIN, "Cf-Access-Jwt-Assertion": token }
+      }), env);
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { reviews: [] });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it("does not disclose answer keys from the health endpoint", async () => {
