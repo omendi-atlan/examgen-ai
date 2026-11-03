@@ -12,6 +12,8 @@ export interface Env {
   OPENAI_MODEL?: string;
   ALLOWED_ORIGIN?: string;
   DB: D1Database;
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
 }
 
 type QuestionType = "multiple_choice" | "dropdown" | "short_answer" | "long_answer" | "numeric";
@@ -225,6 +227,43 @@ async function evaluateWrittenAnswers(exam: GeneratedExam, answers: Record<strin
   return evaluations;
 }
 
+type AccessClaims = { iss?: string; aud?: string[] | string; exp?: number; nbf?: number; email?: string; sub?: string };
+
+function decodeBase64Url(value: string): Uint8Array {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function authenticateExaminer(request: Request, env: Env): Promise<{ email: string } | null> {
+  const domain = env.ACCESS_TEAM_DOMAIN?.trim().replace(/^https?:\\/\\//, "").replace(/\\/$/, "");
+  const audience = env.ACCESS_AUD?.trim();
+  const token = request.headers.get("Cf-Access-Jwt-Assertion");
+  if (!domain || !/^[a-z0-9-]+\\.cloudflareaccess\\.com$/i.test(domain) || !audience || !token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[0]))) as { alg?: string; kid?: string };
+    const claims = JSON.parse(new TextDecoder().decode(decodeBase64Url(parts[1]))) as AccessClaims;
+    if (header.alg !== "RS256" || !header.kid || claims.iss !== `https://${domain}` ||
+        !(Array.isArray(claims.aud) ? claims.aud.includes(audience) : claims.aud === audience) ||
+        typeof claims.exp !== "number" || claims.exp <= Date.now() / 1000 ||
+        (typeof claims.nbf === "number" && claims.nbf > Date.now() / 1000) ||
+        typeof claims.email !== "string" || !claims.email.includes("@")) return null;
+    const keyResponse = await fetch(`https://${domain}/cdn-cgi/access/certs`);
+    if (!keyResponse.ok) return null;
+    const keySet = await keyResponse.json() as { keys?: JsonWebKey[] };
+    const jwk = keySet.keys?.find((key) => (key as JsonWebKey & { kid?: string }).kid === header.kid);
+    if (!jwk) return null;
+    const publicKey = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey,
+      decodeBase64Url(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    return valid ? { email: claims.email } : null;
+  } catch {
+    return null;
+  }
+}
+
 async function readJson(request: Request): Promise<{ value?: unknown; error?: string }> {
   const declaredLength = Number(request.headers.get("Content-Length") ?? "0");
   if (declaredLength > MAX_BODY_BYTES) return { error: "Request is too large." };
@@ -253,6 +292,81 @@ export default {
       return response({ status: "ok", service: "examgen-ai-api", database: "configured" }, 200, origin, allowed);
     }
     if (origin !== allowed) return response({ error: "Origin not allowed." }, 403);
+
+    if (url.pathname.startsWith("/api/examinations/reviews")) {
+      const examiner = await authenticateExaminer(request, env);
+      if (!examiner) return response({ error: "Examiner authentication is required." }, 401, origin, allowed);
+
+      if (url.pathname === "/api/examinations/reviews" && request.method === "GET") {
+        try {
+          const rows = await env.DB.prepare(
+            "SELECT id, mode, subject, created_at, submitted_at FROM examination_attempts WHERE review_status = 'pending' ORDER BY submitted_at ASC LIMIT 100"
+          ).all<{ id: string; mode: string; subject: string; created_at: string; submitted_at: string }>();
+          return response({ reviews: rows.results ?? [] }, 200, origin, allowed);
+        } catch {
+          return response({ error: "The examiner queue could not be loaded." }, 500, origin, allowed);
+        }
+      }
+
+      const detailMatch = url.pathname.match(/^\\/api\\/examinations\\/reviews\\/([0-9a-f-]{36})$/i);
+      if (detailMatch && request.method === "GET") {
+        try {
+          const row = await env.DB.prepare(
+            "SELECT id, mode, subject, exam_json, answers_json, result_json, submitted_at FROM examination_attempts WHERE id = ? AND review_status = 'pending'"
+          ).bind(detailMatch[1]).first<{ id: string; mode: string; subject: string; exam_json: string; answers_json: string | null; result_json: string; submitted_at: string }>();
+          if (!row) return response({ error: "Review item not found." }, 404, origin, allowed);
+          return response({ review: { id: row.id, mode: row.mode, subject: row.subject, submittedAt: row.submitted_at,
+            exam: JSON.parse(row.exam_json), answers: JSON.parse(row.answers_json ?? "{}"), result: JSON.parse(row.result_json) } }, 200, origin, allowed);
+        } catch {
+          return response({ error: "The review item could not be loaded." }, 500, origin, allowed);
+        }
+      }
+
+      if (url.pathname === "/api/examinations/reviews/moderate" && request.method === "POST") {
+        const parsed = await readJson(request);
+        if (parsed.error) return response({ error: parsed.error }, parsed.error.includes("large") ? 413 : 400, origin, allowed);
+        if (!isRecord(parsed.value) || typeof parsed.value.attemptId !== "string" ||
+            !/^[0-9a-f-]{36}$/i.test(parsed.value.attemptId) || !isRecord(parsed.value.questionMarks)) {
+          return response({ error: "A valid attemptId and questionMarks object are required." }, 400, origin, allowed);
+        }
+        try {
+          const row = await env.DB.prepare(
+            "SELECT exam_json, result_json FROM examination_attempts WHERE id = ? AND review_status = 'pending'"
+          ).bind(parsed.value.attemptId).first<{ exam_json: string; result_json: string }>();
+          if (!row) return response({ error: "Review item not found or already moderated." }, 404, origin, allowed);
+          const exam = JSON.parse(row.exam_json) as GeneratedExam;
+          const written = exam.questions.filter((q) => q.type === "short_answer" || q.type === "long_answer");
+          const supplied = parsed.value.questionMarks;
+          const writtenIds = new Set(written.map((q) => q.id));
+          if (Object.keys(supplied).length !== written.length ||
+              Object.keys(supplied).some((id) => !writtenIds.has(id)) ||
+              written.some((q) => !Number.isInteger(supplied[q.id]) || Number(supplied[q.id]) < 0 || Number(supplied[q.id]) > q.marks)) {
+            return response({ error: "Provide a valid final mark for every written question, within its mark allocation." }, 400, origin, allowed);
+          }
+          const result = JSON.parse(row.result_json) as {
+            objectiveScore: number; questionResults: Array<Record<string, unknown>>;
+          };
+          let writtenScore = 0;
+          for (const q of written) {
+            const mark = Number(supplied[q.id]);
+            writtenScore += mark;
+            const questionResult = result.questionResults.find((item) => item.questionId === q.id);
+            if (questionResult) Object.assign(questionResult, { marksAwarded: mark, status: "moderated", moderatedBy: examiner.email });
+          }
+          const finalScore = result.objectiveScore + writtenScore;
+          const moderation = { writtenScore, finalScore, totalMarks: exam.totalMarks, moderatedBy: examiner.email };
+          const updatedResult = { ...result, writtenScore, finalScore, status: "marked", pendingReviewCount: 0, moderation };
+          const update = await env.DB.prepare(
+            "UPDATE examination_attempts SET review_status = 'approved', moderation_json = ?, moderated_by = ?, moderated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), result_json = ? WHERE id = ? AND review_status = 'pending'"
+          ).bind(JSON.stringify(moderation), examiner.email, JSON.stringify(updatedResult), parsed.value.attemptId).run();
+          if (update.meta.changes !== 1) return response({ error: "This review item was already moderated." }, 409, origin, allowed);
+          return response({ result: updatedResult }, 200, origin, allowed);
+        } catch {
+          return response({ error: "The examiner decision could not be saved." }, 500, origin, allowed);
+        }
+      }
+      return response({ error: "Not found." }, 404, origin, allowed);
+    }
 
     if (url.pathname === "/api/examinations/attempts/submit" && request.method === "POST") {
       const parsed = await readJson(request);
