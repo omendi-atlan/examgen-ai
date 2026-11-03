@@ -1,6 +1,7 @@
 interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
   first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results?: T[] }>;
   run(): Promise<{ meta: { changes: number } }>;
 }
 interface D1Database {
