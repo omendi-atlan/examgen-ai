@@ -128,6 +128,13 @@ describe("EXAMGEN AI Worker submission safeguards", () => {
     assert.equal(response.status, 400);
   });
 
+  it("denies examiner queue access without a valid Cloudflare Access identity", async () => {
+    const response = await worker.fetch(new Request("https://worker.test/api/examinations/reviews", {
+      method: "GET", headers: { Origin: ORIGIN }
+    }), makeEnv(seededDb()));
+    assert.equal(response.status, 401);
+  });
+
   it("does not disclose answer keys from the health endpoint", async () => {
     const response = await worker.fetch(new Request("https://worker.test/health"), makeEnv(seededDb()));
     assert.equal(response.status, 200);
