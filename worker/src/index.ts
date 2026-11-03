@@ -238,7 +238,8 @@ export default {
         if (!row) return response({ error: "Examination attempt not found." }, 404, origin, allowed);
         if (row.status !== "submitted") return response({ error: "Only submitted attempts can be self-assessed." }, 409, origin, allowed);
         const exam = JSON.parse(row.exam_json) as Exam;
-        const question = exam.questions.find((q) => q.id === parsed.value.questionId);
+        const questionId = String(parsed.value.questionId);
+        const question = exam.questions.find((q) => q.id === questionId);
         if (!question || (question.type !== "short_answer" && question.type !== "long_answer") || !question.rubric) {
           return response({ error: "The selected question does not have a written-answer rubric." }, 400, origin, allowed);
         }
