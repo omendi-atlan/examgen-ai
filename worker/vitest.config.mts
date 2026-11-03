@@ -5,7 +5,7 @@ export default defineWorkersConfig({
     include: ["worker/tests/integration/**/*.integration.test.mjs"],
     poolOptions: {
       workers: {
-        wrangler: { configPath: "./worker/wrangler.toml" }
+        wrangler: { configPath: "./wrangler.toml" }
       }
     }
   }
