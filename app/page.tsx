@@ -86,7 +86,7 @@ export default function Home(){
     {error&&<p className="error" role="alert">{error}</p>}
     <p className="muted">The question editor accepts authored questions and marking rubrics. Correct answers, explanations and rubrics are stored server-side and are not returned to the examination page.</p>
    </div>
-   <aside className="panel"><span className="eyebrow">ASSESSMENT SNAPSHOT</span><h2>Configuration</h2><div className="stat"><span>Total marks</span><b>{marks}</b></div><div className="stat"><span>Time allowed</span><b>{duration} min</b></div><div className="stat"><span>Mode</span><b>{mode}</b></div><div className="stat"><span>Difficulty setting</span><b>{difficulty}</b></div><p className="muted">The submitted question marks must add up exactly to the configured total. Rubric criteria must also add up to their question's mark allocation.</p></aside>
+   <aside className="panel"><span className="eyebrow">ASSESSMENT SNAPSHOT</span><h2>Configuration</h2><div className="stat"><span>Total marks</span><b>{marks}</b></div><div className="stat"><span>Time allowed</span><b>{duration} min</b></div><div className="stat"><span>Mode</span><b>{mode}</b></div><div className="stat"><span>Difficulty setting</span><b>{difficulty}</b></div><p className="muted">The submitted question marks must add up exactly to the configured total. Rubric criteria must also add up to their question&apos;s mark allocation.</p></aside>
   </section>
   <section className="panel" style={{marginTop:18}}><span className="eyebrow">02 / EXAMINATION PAPER</span>
    {!exam?<h2>Create an examination to begin</h2>:<>
