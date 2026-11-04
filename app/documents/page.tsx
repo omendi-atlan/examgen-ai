@@ -12,6 +12,14 @@ type QualityReport = {
   automatically_approved: boolean;
 };
 type Segment = { id: string; ordinal: number; locator: string; text: string; metadata: Record<string, unknown> };
+type ExtractionReview = {
+  id: string;
+  version_id: string;
+  decision: "accepted" | "rejected";
+  rationale: string;
+  reviewed_by: string;
+  created_at: string;
+};
 type Version = {
   id: string;
   version_number: number;
@@ -50,7 +58,10 @@ export default function DocumentReviewPage() {
   const [documentId, setDocumentId] = useState("");
   const [versionId, setVersionId] = useState("");
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [reviews, setReviews] = useState<ExtractionReview[]>([]);
+  const [rationale, setRationale] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -111,6 +122,7 @@ export default function DocumentReviewPage() {
       setDocumentId(result[0]?.id ?? "");
       setVersionId(result[0]?.versions.at(-1)?.id ?? "");
       setSegments([]);
+      setReviews([]);
       setNotice(`Loaded ${result.length} document(s) from the selected workspace.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load documents.");
@@ -122,36 +134,64 @@ export default function DocumentReviewPage() {
   useEffect(() => {
     if (!token || !workspaceId || !documentId || !versionId) {
       setSegments([]);
+      setReviews([]);
       return;
     }
     let active = true;
     setBusy(true);
-    async function loadSegments() {
+    async function loadSelectedVersion() {
       try {
-        const response = await fetch(
-          `${base}/api/v1/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/segments`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        const data: unknown = await response.json();
-        if (!response.ok) {
-          const detail = typeof data === "object" && data !== null && "detail" in data
-            ? String((data as { detail: unknown }).detail)
-            : "Could not load extracted text.";
-          throw new Error(detail);
+        const [segmentResult, reviewResult] = await Promise.all([
+          request<Segment[]>(`/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/segments`),
+          request<ExtractionReview[]>(`/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/extraction-reviews`),
+        ]);
+        if (active) {
+          setSegments(segmentResult);
+          setReviews(reviewResult);
+          setError("");
         }
-        if (active) setSegments(data as Segment[]);
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : "Could not load extracted text.");
+        if (active) setError(cause instanceof Error ? cause.message : "Could not load source review data.");
       } finally {
         if (active) setBusy(false);
       }
     }
-    void loadSegments();
+    void loadSelectedVersion();
     return () => { active = false; };
   }, [token, workspaceId, documentId, versionId, base]);
 
+  async function submitReview(decision: "accepted" | "rejected") {
+    if (!selectedDocument || !selectedVersion || rationale.trim().length < 3) {
+      setError("Enter a meaningful rationale before submitting the review.");
+      return;
+    }
+    setReviewBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const created = await request<ExtractionReview>(
+        `/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/extraction-reviews`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decision, rationale: rationale.trim() }),
+        },
+      );
+      setReviews((current) => [...current, created]);
+      setRationale("");
+      setNotice(`Extraction review recorded: ${decision}.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not record extraction review.");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+
   const statusLabel = useMemo(() => selectedVersion?.extraction?.status.replaceAll("_", " ") ?? "not processed", [selectedVersion]);
   const panelStyle = { background: "#11151e", border: "1px solid #262e3b", borderRadius: 15, padding: 20 } as const;
+  const canAccept = selectedVersion?.extraction?.status === "extracted"
+    && (selectedVersion.extraction.character_count > 0)
+    && (selectedVersion.extraction.segment_count > 0);
 
   return (
     <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 18px", color: "#f4f6fa" }}>
@@ -179,7 +219,7 @@ export default function DocumentReviewPage() {
           <form onSubmit={loadDocuments} style={{ display: "grid", gridTemplateColumns: "minmax(220px,1fr) auto auto", gap: 12, alignItems: "end" }}>
             <label style={{ color: "#cbd3df", fontSize: 13 }}>Workspace ID<input required value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} style={inputStyle} /></label>
             <button type="submit" disabled={busy || !workspaceId.trim()} style={buttonStyle}>Load documents</button>
-            <button type="button" onClick={() => { setToken(""); setDocuments([]); setSegments([]); setWorkspaceId(""); setDocumentId(""); setVersionId(""); }} style={{ ...buttonStyle, background: "#263141", color: "#e5eaf1" }}>Sign out</button>
+            <button type="button" onClick={() => { setToken(""); setDocuments([]); setSegments([]); setReviews([]); setWorkspaceId(""); setDocumentId(""); setVersionId(""); }} style={{ ...buttonStyle, background: "#263141", color: "#e5eaf1" }}>Sign out</button>
           </form>
         )}
         {error && <p role="alert" style={{ color: "#ff9a9a" }}>{error}</p>}
@@ -208,11 +248,28 @@ export default function DocumentReviewPage() {
                   </div>
                   <label style={{ display: "block", color: "#cbd3df", fontSize: 13, marginTop: 16 }}>Source version<select value={versionId} onChange={(event) => setVersionId(event.target.value)} style={inputStyle}>{selectedDocument?.versions.map((version) => <option key={version.id} value={version.id}>Version {version.version_number} — {version.original_filename}</option>)}</select></label>
                   {quality && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: 8, margin: "16px 0" }}>
-                    {[["Characters", quality.character_count], ["Segments", quality.segment_count], ["Pages", quality.page_count ?? "—"]].map(([label, value]) => <div key={String(label)} style={{ background: "#0c1119", borderRadius: 9, padding: 12 }}><small style={{ color: "#9aa5b5" }}>{label}</small><strong style={{ display: "block", fontSize: 20, marginTop: 4 }}>{value}</strong></div>)}
+                    {[[ "Characters", quality.character_count ], [ "Segments", quality.segment_count ], [ "Pages", quality.page_count ?? "—" ]].map(([label, value]) => <div key={String(label)} style={{ background: "#0c1119", borderRadius: 9, padding: 12 }}><small style={{ color: "#9aa5b5" }}>{label}</small><strong style={{ display: "block", fontSize: 20, marginTop: 4 }}>{value}</strong></div>)}
                   </div>}
                   {quality?.reasons.map((reason) => <p key={reason} style={{ color: "#ffbe86", fontSize: 13 }}>• {reason}</p>)}
                   <p style={{ color: "#9aa5b5", fontSize: 12 }}>Quality outcome: <strong style={{ color: "#55d5e8" }}>{quality?.outcome ?? "pending"}</strong>. Automated approval: no.</p>
                   {selectedVersion.classifications.length > 0 && <p style={{ color: "#9aa5b5", fontSize: 13 }}>Confirmed topics: {selectedVersion.classifications.map((item) => `${item.subject_name} / ${item.topic_name}`).join(", ")}</p>}
+                  <div style={{ borderTop: "1px solid #303a49", marginTop: 18, paddingTop: 16 }}>
+                    <h3 style={{ fontSize: 15, marginTop: 0 }}>5. Examiner decision</h3>
+                    <p style={{ color: "#9aa5b5", fontSize: 12, lineHeight: 1.6 }}>Acceptance is available only for a completed, non-empty extraction. Rejection remains available for sources that require correction or reprocessing. Every decision requires a rationale and is permanently recorded.</p>
+                    <label style={{ display: "block", color: "#cbd3df", fontSize: 13 }}>Review rationale<textarea required minLength={3} maxLength={4000} value={rationale} onChange={(event) => setRationale(event.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Explain the academic or extraction-quality reason for this decision." /></label>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+                      <button type="button" disabled={reviewBusy || busy || !canAccept || rationale.trim().length < 3} onClick={() => void submitReview("accepted")} style={{ ...buttonStyle, opacity: !canAccept || rationale.trim().length < 3 ? 0.5 : 1 }}>Accept extraction</button>
+                      <button type="button" disabled={reviewBusy || busy || !selectedVersion.extraction || rationale.trim().length < 3} onClick={() => void submitReview("rejected")} style={{ ...buttonStyle, background: "#63353b", color: "#fff" }}>Reject extraction</button>
+                      {reviewBusy && <span style={{ color: "#9aa5b5", alignSelf: "center", fontSize: 12 }}>Saving decision…</span>}
+                    </div>
+                    <h4 style={{ fontSize: 13, marginBottom: 8 }}>Decision history ({reviews.length})</h4>
+                    {reviews.length === 0 && <p style={{ color: "#9aa5b5", fontSize: 12 }}>No examiner decisions have been recorded for this version.</p>}
+                    {reviews.map((review) => <article key={review.id} style={{ borderTop: "1px solid #262e3b", padding: "10px 0" }}>
+                      <strong style={{ color: review.decision === "accepted" ? "#79d6a5" : "#ff9a9a", textTransform: "capitalize" }}>{review.decision}</strong>
+                      <p style={{ margin: "5px 0", color: "#e2e7ef", fontSize: 13 }}>{review.rationale}</p>
+                      <small style={{ color: "#788598" }}>{new Date(review.created_at).toLocaleString()} · Reviewer {review.reviewed_by}</small>
+                    </article>)}
+                  </div>
                 </>
               ) : <p style={{ color: "#9aa5b5" }}>Choose a source version to review.</p>}
             </section>
