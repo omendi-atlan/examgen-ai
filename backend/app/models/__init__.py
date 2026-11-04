@@ -15,6 +15,13 @@ from app.models.academic import (
     Subject,
     Topic,
 )
+from app.models.assessment import (
+    BlueprintOutcomeWeight,
+    BlueprintTopicWeight,
+    BlueprintVersionStatus,
+    ExamBlueprint,
+    ExamBlueprintVersion,
+)
 from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
 from app.models.identity import (
     ApiRateLimitBucket,
@@ -30,6 +37,11 @@ __all__ = [
     "AcademicDocument",
     "ApiRateLimitBucket",
     "AuditEvent",
+    "BlueprintOutcomeWeight",
+    "BlueprintTopicWeight",
+    "BlueprintVersionStatus",
+    "ExamBlueprint",
+    "ExamBlueprintVersion",
     "ClassificationMethod",
     "DocumentExtraction",
     "DocumentExtractionReview",
@@ -38,6 +50,9 @@ __all__ = [
     "DocumentVersion",
     "ExtractionStatus",
     "LearningOutcome",
+    "Question",
+    "QuestionReviewStatus",
+    "QuestionVersion",
     "ExtractionJobStatus",
     "DocumentProcessingJob",
     "MembershipRole",
