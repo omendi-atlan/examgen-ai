@@ -21,7 +21,12 @@ def _build_engine(database_url: str) -> Engine:
 
 
 engine = _build_engine(get_settings().database_url)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    autocommit=False,
+    expire_on_commit=False,
+)
 
 
 def get_db() -> Generator[Session, None, None]:
