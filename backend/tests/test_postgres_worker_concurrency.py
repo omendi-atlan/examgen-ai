@@ -6,8 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.database import Base
 from app.models import (
@@ -19,6 +17,8 @@ from app.models import (
     Workspace,
 )
 from app.services.document_processing import claim_next_job, recover_expired_jobs
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(
