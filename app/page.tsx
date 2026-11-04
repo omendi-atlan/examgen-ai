@@ -1,13 +1,55 @@
-"use client";
-import { useState } from "react";
-type Question={id:string;section:string;prompt:string;type:"multiple_choice"|"dropdown"|"short_answer"|"long_answer"|"numeric";marks:number;difficulty:"foundation"|"intermediate"|"advanced";options?:string[];answer?:string;explanation?:string};
-type Exam={title:string;subject:string;durationMinutes:number;totalMarks:number;instructions:string[];questions:Question[]};
-export default function Home(){
- const [subject,setSubject]=useState("Project Management"),[topics,setTopics]=useState("Project constraints, risk management, project scheduling"),[marks,setMarks]=useState(40),[duration,setDuration]=useState(60),[mode,setMode]=useState("practice"),[difficulty,setDifficulty]=useState("balanced"),[visual,setVisual]=useState(false),[exam,setExam]=useState<Exam|null>(null),[answers,setAnswers]=useState<Record<string,string>>({}),[submitted,setSubmitted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
- async function generate(){setBusy(true);setError("");setSubmitted(false);setAnswers({});try{const apiBase=process.env.NEXT_PUBLIC_EXAMGEN_API_URL;if(!apiBase)throw new Error("The AI service is not connected yet. Configure NEXT_PUBLIC_EXAMGEN_API_URL in the GitHub Actions repository variables.");const r=await fetch(`${apiBase.replace(/\/$/,"")}/api/examinations/generate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subject,topics:topics.split(",").map(x=>x.trim()).filter(Boolean),totalMarks:marks,durationMinutes:duration,mode,difficulty,visualRequirements:visual})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Generation failed");setExam(d.exam)}catch(e){setError(e instanceof Error?e.message:"Generation failed")}finally{setBusy(false)}}
- const objective=exam?.questions.filter(q=>q.type==="multiple_choice"||q.type==="dropdown"),score=(objective??[]).filter(q=>answers[q.id]?.toLowerCase()===q.answer?.toLowerCase()).reduce((s,q)=>s+q.marks,0);
- return <main className="shell"><header><div className="brand">EXAMGEN <b>AI</b></div><span className="pill">PERSONAL LEARNING WORKSPACE</span></header><section className="hero"><span className="eyebrow">EXAMINATION & LEARNING INTELLIGENCE</span><h1>Turn your study material into a smarter exam.</h1><p className="muted">Build subject-specific assessments, practise with structured questions and review your performance.</p></section>
- <section className="grid"><div className="panel"><span className="eyebrow">01 / EXAM CONFIGURATION</span><h2>Examination setup</h2><label>Subject or module<input value={subject} onChange={e=>setSubject(e.target.value)}/></label><label>Topics<textarea rows={3} value={topics} onChange={e=>setTopics(e.target.value)}/></label><div className="row"><label>Total marks<input type="number" min={5} max={200} value={marks} onChange={e=>setMarks(+e.target.value)}/></label><label>Duration (minutes)<input type="number" min={10} max={240} value={duration} onChange={e=>setDuration(+e.target.value)}/></label></div><div className="row"><label>Mode<select value={mode} onChange={e=>setMode(e.target.value)}><option value="practice">Practice · feedback after submit</option><option value="simulation">Formal simulation</option></select></label><label>Difficulty<select value={difficulty} onChange={e=>setDifficulty(e.target.value)}><option value="balanced">Balanced</option><option value="foundation">Foundation</option><option value="challenging">Challenging</option><option value="advanced">Advanced</option></select></label></div><label><span><input type="checkbox" checked={visual} onChange={e=>setVisual(e.target.checked)}/> Consider visuals where academically necessary</span></label><button className="btn" onClick={generate} disabled={busy||!subject.trim()}>{busy?"Generating…":"Generate examination →"}</button>{error&&<p className="error">{error}</p>}<p className="muted">AI requests are sent to the separately deployed API. The provider key is never placed in this website.</p></div>
- <aside className="panel"><span className="eyebrow">ASSESSMENT SNAPSHOT</span><h2>Configuration</h2><div className="stat"><span>Total marks</span><b>{marks}</b></div><div className="stat"><span>Time allowed</span><b>{duration} min</b></div><div className="stat"><span>Mode</span><b>{mode}</b></div><div className="stat"><span>Difficulty</span><b>{difficulty}</b></div><p className="muted">Blueprint design should align topic weighting and cognitive demand to the module outcomes and lecturer guidance.</p></aside></section>
- <section className="panel" style={{marginTop:18}}><span className="eyebrow">ASSESSMENT PAPER</span>{!exam?<h2>Generate an examination to begin</h2>:<><h2>{exam.title}</h2><p className="muted">{exam.subject} · {exam.durationMinutes} minutes · {exam.totalMarks} marks</p>{exam.instructions.map(x=><p className="muted" key={x}>• {x}</p>)}{exam.questions.map((q,i)=><article className="question" key={q.id}><div className="stat"><span>{q.section} · {q.id}</span><b>{q.marks} marks</b></div><h3>{i+1}. {q.prompt}</h3>{q.options?<div>{q.options.map(o=><label className="option" key={o}><input type="radio" name={q.id} checked={answers[q.id]===o} onChange={()=>setAnswers(a=>({...a,[q.id]:o}))}/>{o}</label>)}</div>:<textarea className="answer" rows={q.type==="long_answer"?6:3} value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))} placeholder="Write your answer here…"/>}{submitted&&mode==="practice"&&<p className="muted"><b>Study guidance:</b> {q.explanation}</p>}</article>)}<button className="btn" onClick={()=>setSubmitted(true)}>Submit examination</button>{submitted&&mode==="practice"&&<div className="stat"><b>Provisional practice objective score</b><b>{score} / {(objective??[]).reduce((s,q)=>s+q.marks,0)}</b></div>}{submitted&&mode==="simulation"&&<p className="muted">Your responses are locked for this session. No answer key or score is exposed. Secure server-side submission and marking are being implemented.</p>}</>}</section><footer className="footer">EXAMGEN AI · Foundation release · Written responses require rubric-based marking.</footer></main>
+import Link from "next/link";
+
+const tile = {
+  border: "1px solid #293242",
+  borderRadius: 16,
+  padding: 22,
+  background: "#11151e",
+  display: "flex",
+  flexDirection: "column" as const,
+  gap: 12,
+};
+
+export default function Home() {
+  return (
+    <main style={{ maxWidth: 1120, margin: "0 auto", padding: "34px 20px", color: "#f4f6fa" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #293242", paddingBottom: 18 }}>
+        <strong style={{ fontSize: 20, letterSpacing: ".04em" }}>EXAMGEN <span style={{ color: "#ff8a35" }}>AI</span></strong>
+        <span style={{ color: "#55d5e8", fontSize: 11, letterSpacing: ".12em" }}>PERSONAL LEARNING WORKSPACE</span>
+      </header>
+
+      <section style={{ padding: "52px 0 30px", maxWidth: 780 }}>
+        <p style={{ color: "#ff8a35", fontSize: 11, fontWeight: 800, letterSpacing: ".16em" }}>LEARN FROM YOUR OWN COURSEWORK</p>
+        <h1 style={{ fontSize: "clamp(34px,5vw,54px)", lineHeight: 1.08, margin: "12px 0" }}>Your material. Your question bank. Your exam preparation.</h1>
+        <p style={{ color: "#9aa5b5", lineHeight: 1.7, fontSize: 16 }}>Upload your subject resources first. EXAMGEN AI extracts and organises the material, then uses approved assessment blueprints to generate source-cited practice questions. Your private uploads stay private by default.</p>
+      </section>
+
+      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 14 }}>
+        <article style={tile}>
+          <span style={{ color: "#ff8a35", fontSize: 11, fontWeight: 800 }}>01 · COURSEWORK</span>
+          <h2 style={{ fontSize: 22, margin: 0 }}>Upload your study resources</h2>
+          <p style={{ color: "#9aa5b5", lineHeight: 1.6, margin: 0 }}>Add lecture notes, slides, readings, worksheets, diagrams and previous assessments to the correct subject. Track scanning, extraction and revisions.</p>
+          <Link href="/coursework" style={{ color: "#ff8a35", fontWeight: 800, textDecoration: "none", marginTop: "auto" }}>Open coursework resources →</Link>
+        </article>
+
+        <article style={tile}>
+          <span style={{ color: "#55d5e8", fontSize: 11, fontWeight: 800 }}>02 · QUESTION BANK</span>
+          <h2 style={{ fontSize: 22, margin: 0 }}>Generate source-cited questions</h2>
+          <p style={{ color: "#9aa5b5", lineHeight: 1.6, margin: 0 }}>Select extracted resources and an approved blueprint. Generate private draft questions with topic, learning-outcome and source references.</p>
+          <Link href="/question-bank" style={{ color: "#55d5e8", fontWeight: 800, textDecoration: "none", marginTop: "auto" }}>Open question bank →</Link>
+        </article>
+
+        <article style={{ ...tile, opacity: .78 }}>
+          <span style={{ color: "#b5a0ff", fontSize: 11, fontWeight: 800 }}>03 · PRACTICE EXAMINATIONS</span>
+          <h2 style={{ fontSize: 22, margin: 0 }}>Attempt timed simulations</h2>
+          <p style={{ color: "#9aa5b5", lineHeight: 1.6, margin: 0 }}>The next delivery adds assembled examination papers, timed attempts, autosave, durable submissions and server-side marking.</p>
+          <span style={{ color: "#b5a0ff", fontSize: 12, fontWeight: 800, marginTop: "auto" }}>IN IMPLEMENTATION · NOT YET RELEASED</span>
+        </article>
+      </section>
+
+      <section style={{ borderTop: "1px solid #293242", marginTop: 30, paddingTop: 20 }}>
+        <p style={{ color: "#8793a5", fontSize: 12, lineHeight: 1.6 }}>Academic extraction is not the same as academic approval. Generated questions remain private drafts until an authorised reviewer approves them. Answer keys and unreleased marking rubrics are never included in student question-bank responses.</p>
+      </section>
+    </main>
+  );
 }
