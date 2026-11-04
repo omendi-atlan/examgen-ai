@@ -80,4 +80,4 @@ def test_concurrent_representative_text_extraction_preserves_all_source_chunks(
         assert sum(len(segment.text) for segment in result.segments) == expected_characters
         assert len(result.segments) == 64
         assert result.segments[0].locator == "text:chars-1-4000"
-        assert result.segments[-1].locator == "text:chars-253001-256000"
+        assert result.segments[-1].locator == "text:chars-252001-256000"
