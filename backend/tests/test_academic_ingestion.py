@@ -585,3 +585,439 @@ def test_academic_upload_rate_limit_is_shared_and_returns_retry_after(
     )
     assert limited.status_code == 429
     assert int(limited.headers["Retry-After"]) > 0
+
+
+def test_student_coursework_resources_are_private_and_subject_scoped(client: TestClient) -> None:
+    from app.models import MembershipRole, MembershipStatus, User, WorkspaceMembership
+
+    owner_token, workspace_id = create_workspace(client, "coursework-owner@example.test")
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=owner_headers,
+        json={"name": "INL201"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+    other_subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=owner_headers,
+        json={"name": "INL202"},
+    )
+    assert other_subject.status_code == 201
+
+    with Session(app.state.test_engine) as db:
+        owner_membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id)
+            )
+        )
+        assert owner_membership is not None
+        owner_membership.role = MembershipRole.STUDENT
+        db.commit()
+
+    available_subjects = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects",
+        headers=owner_headers,
+    )
+    assert available_subjects.status_code == 200
+    assert subject_id in [item["id"] for item in available_subjects.json()]
+
+    uploaded = client.post(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=owner_headers,
+        data={"title": "INL201 lecture notes"},
+        files={"file": ("lecture.txt", b"Variables, functions and control flow.", "text/plain")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    resource = uploaded.json()
+    assert resource["subject_id"] == subject_id
+    assert resource["visibility"] == "private"
+    assert resource["versions"][0]["extraction"]["status"] == "queued"
+
+    listed = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=owner_headers,
+    )
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [resource["id"]]
+
+    wrong_subject = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{other_subject.json()['id']}/resources/{resource['id']}",
+        headers=owner_headers,
+    )
+    assert wrong_subject.status_code == 404
+
+    second_user_email = "coursework-second-student@example.test"
+    registered = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": second_user_email,
+            "display_name": "Second student",
+            "password": "Correct-Horse-Battery-9!",
+        },
+    )
+    assert registered.status_code == 201
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": second_user_email, "password": "Correct-Horse-Battery-9!"},
+    )
+    assert login.status_code == 200
+    second_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    with Session(app.state.test_engine) as db:
+        second_user = db.scalar(select(User).where(User.email == second_user_email))
+        assert second_user is not None
+        db.add(
+            WorkspaceMembership(
+                workspace_id=UUID(workspace_id),
+                user_id=second_user.id,
+                role=MembershipRole.STUDENT,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+        db.commit()
+
+    hidden = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/{resource['id']}",
+        headers=second_headers,
+    )
+    assert hidden.status_code == 404
+
+    forbidden_staff_listing = client.get(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers=owner_headers,
+    )
+    assert forbidden_staff_listing.status_code == 403
+
+
+def test_coursework_cohort_sharing_requires_staff_policy(client: TestClient) -> None:
+    from app.models import MembershipRole, WorkspaceMembership
+
+    token, workspace_id = create_workspace(client, "coursework-sharing@example.test")
+    headers = {"Authorization": f"Bearer {token}"}
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=headers,
+        json={"name": "Shared Module"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+
+    with Session(app.state.test_engine) as db:
+        membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id)
+            )
+        )
+        assert membership is not None
+        membership.role = MembershipRole.STUDENT
+        db.commit()
+
+    denied = client.post(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=headers,
+        data={"title": "Unapproved cohort notes", "visibility": "cohort"},
+        files={"file": ("notes.txt", b"Shared notes", "text/plain")},
+    )
+    assert denied.status_code == 409
+
+
+def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled(
+    client: TestClient,
+) -> None:
+    from app.models import MembershipRole, MembershipStatus, User, WorkspaceMembership
+
+    owner_token, workspace_id = create_workspace(client, "coursework-cohort-owner@example.test")
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=owner_headers,
+        json={"name": "Cohort Sharing Module"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+
+    enabled = client.put(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
+        headers=owner_headers,
+        json={"enabled": True},
+    )
+    assert enabled.status_code == 200
+    assert enabled.json()["resource_sharing_enabled"] is True
+
+    second_email = "coursework-cohort-member@example.test"
+    assert client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": second_email,
+            "display_name": "Cohort member",
+            "password": "Correct-Horse-Battery-9!",
+        },
+    ).status_code == 201
+    second_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": second_email, "password": "Correct-Horse-Battery-9!"},
+    )
+    assert second_login.status_code == 200
+    second_headers = {"Authorization": f"Bearer {second_login.json()['access_token']}"}
+
+    with Session(app.state.test_engine) as db:
+        owner_membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id),
+                WorkspaceMembership.role == MembershipRole.OWNER,
+            )
+        )
+        assert owner_membership is not None
+        owner_membership.role = MembershipRole.STUDENT
+        second_user = db.scalar(select(User).where(User.email == second_email))
+        assert second_user is not None
+        db.add(
+            WorkspaceMembership(
+                workspace_id=UUID(workspace_id),
+                user_id=second_user.id,
+                role=MembershipRole.STUDENT,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+        db.commit()
+
+    shared = client.post(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=owner_headers,
+        data={"title": "Approved cohort notes", "visibility": "cohort"},
+        files={"file": ("cohort.txt", b"Notes shared by the lecturer-approved cohort policy.", "text/plain")},
+    )
+    assert shared.status_code == 201, shared.text
+    resource_id = shared.json()["id"]
+    version_id = shared.json()["versions"][0]["id"]
+
+    visible = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=second_headers,
+    )
+    assert visible.status_code == 200
+    assert resource_id in [item["id"] for item in visible.json()]
+    shared_download = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/"
+        f"{resource_id}/versions/{version_id}/download",
+        headers=second_headers,
+    )
+    assert shared_download.status_code == 200
+    assert shared_download.content == b"Notes shared by the lecturer-approved cohort policy."
+
+    student_policy_denied = client.put(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
+        headers=owner_headers,
+        json={"enabled": False},
+    )
+    assert student_policy_denied.status_code == 403
+
+    with Session(app.state.test_engine) as db:
+        owner_membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id),
+                WorkspaceMembership.user_id == UUID(shared.json()["created_by"]),
+            )
+        )
+        assert owner_membership is not None
+        owner_membership.role = MembershipRole.OWNER
+        db.commit()
+
+    disabled = client.put(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
+        headers=owner_headers,
+        json={"enabled": False},
+    )
+    assert disabled.status_code == 200
+    hidden = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/{resource_id}",
+        headers=second_headers,
+    )
+    assert hidden.status_code == 404
+    hidden_download = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/"
+        f"{resource_id}/versions/{version_id}/download",
+        headers=second_headers,
+    )
+    assert hidden_download.status_code == 404
+
+
+def test_coursework_download_is_object_authorised_and_checksum_verified(client: TestClient) -> None:
+    from app.models import MembershipRole, MembershipStatus, User, WorkspaceMembership
+
+    token, workspace_id = create_workspace(client, "coursework-download-owner@example.test")
+    headers = {"Authorization": f"Bearer {token}"}
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=headers,
+        json={"name": "Download Security"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+    uploaded = client.post(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=headers,
+        data={"title": "Private download source"},
+        files={"file": ("private-notes.txt", b"Only the owner can download this source.", "text/plain")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    resource = uploaded.json()
+    version_id = resource["versions"][0]["id"]
+
+    download_url = (
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/"
+        f"{resource['id']}/versions/{version_id}/download"
+    )
+    response = client.get(download_url, headers=headers)
+    assert response.status_code == 200
+    assert response.content == b"Only the owner can download this source."
+    assert response.headers["cache-control"] == "private, no-store"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert "private-notes.txt" in response.headers["content-disposition"]
+
+    second_email = "coursework-download-outsider@example.test"
+    assert client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": second_email,
+            "display_name": "Download outsider",
+            "password": "Correct-Horse-Battery-9!",
+        },
+    ).status_code == 201
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"email": second_email, "password": "Correct-Horse-Battery-9!"},
+    )
+    assert login.status_code == 200
+    outsider_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    with Session(app.state.test_engine) as db:
+        outsider = db.scalar(select(User).where(User.email == second_email))
+        assert outsider is not None
+        db.add(
+            WorkspaceMembership(
+                workspace_id=UUID(workspace_id),
+                user_id=outsider.id,
+                role=MembershipRole.STUDENT,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+        db.commit()
+    denied = client.get(download_url, headers=outsider_headers)
+    assert denied.status_code == 404
+
+
+def test_student_can_retry_only_their_failed_coursework_extraction(client: TestClient) -> None:
+    from app.models import (
+        DocumentExtraction,
+        DocumentProcessingJob,
+        ExtractionJobStatus,
+        ExtractionStatus,
+        MembershipRole,
+        MembershipStatus,
+        User,
+        WorkspaceMembership,
+    )
+
+    token, workspace_id = create_workspace(client, "coursework-retry-owner@example.test")
+    headers = {"Authorization": f"Bearer {token}"}
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=headers,
+        json={"name": "Retry Module"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+    uploaded = client.post(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=headers,
+        data={"title": "Failed OCR source"},
+        files={"file": ("retry.txt", b"Content for retry verification.", "text/plain")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    resource = uploaded.json()
+    version_id = resource["versions"][0]["id"]
+    retry_url = (
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/"
+        f"{resource['id']}/versions/{version_id}/retry"
+    )
+
+    with Session(app.state.test_engine) as db:
+        job = db.scalar(select(DocumentProcessingJob).where(DocumentProcessingJob.version_id == UUID(version_id)))
+        extraction = db.scalar(select(DocumentExtraction).where(DocumentExtraction.version_id == UUID(version_id)))
+        assert job is not None and extraction is not None
+        job.status = ExtractionJobStatus.FAILED
+        job.attempts = job.max_attempts
+        job.error_message = "Transient OCR worker failure"
+        job.finished_at = 123456.0
+        extraction.status = ExtractionStatus.FAILED
+        extraction.error_message = "Transient OCR worker failure"
+        extraction.quality_report = {"outcome": "failed", "automatically_approved": False}
+        db.commit()
+
+    retried = client.post(retry_url, headers=headers)
+    assert retried.status_code == 200, retried.text
+    current = retried.json()["versions"][0]["extraction"]
+    assert current["status"] == "queued"
+    assert current["error_message"] is None
+
+    with Session(app.state.test_engine) as db:
+        job = db.scalar(select(DocumentProcessingJob).where(DocumentProcessingJob.version_id == UUID(version_id)))
+        assert job is not None
+        assert job.status == ExtractionJobStatus.QUEUED
+        assert job.attempts == 0
+        assert job.finished_at is None
+
+    # A second retry is rejected while the worker queue is already active.
+    duplicate_retry = client.post(retry_url, headers=headers)
+    assert duplicate_retry.status_code == 409
+
+    # Recreate a terminal failure to prove a different student cannot retry it.
+    with Session(app.state.test_engine) as db:
+        job = db.scalar(select(DocumentProcessingJob).where(DocumentProcessingJob.version_id == UUID(version_id)))
+        extraction = db.scalar(select(DocumentExtraction).where(DocumentExtraction.version_id == UUID(version_id)))
+        assert job is not None and extraction is not None
+        job.status = ExtractionJobStatus.FAILED
+        job.attempts = job.max_attempts
+        extraction.status = ExtractionStatus.FAILED
+        db.commit()
+
+    with Session(app.state.test_engine) as db:
+        membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id)
+            )
+        )
+        assert membership is not None
+        membership.role = MembershipRole.STUDENT
+        db.commit()
+
+    other_email = "coursework-retry-outsider@example.test"
+    assert client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": other_email,
+            "display_name": "Retry outsider",
+            "password": "Correct-Horse-Battery-9!",
+        },
+    ).status_code == 201
+    other_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": other_email, "password": "Correct-Horse-Battery-9!"},
+    )
+    assert other_login.status_code == 200
+    other_headers = {"Authorization": f"Bearer {other_login.json()['access_token']}"}
+    with Session(app.state.test_engine) as db:
+        other_user = db.scalar(select(User).where(User.email == other_email))
+        assert other_user is not None
+        db.add(
+            WorkspaceMembership(
+                workspace_id=UUID(workspace_id),
+                user_id=other_user.id,
+                role=MembershipRole.STUDENT,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+        db.commit()
+    forbidden = client.post(retry_url, headers=other_headers)
+    assert forbidden.status_code == 404

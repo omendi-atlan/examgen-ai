@@ -113,6 +113,8 @@ def _document_response(document: AcademicDocument) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
         workspace_id=document.workspace_id,
+        subject_id=document.subject_id,
+        visibility=document.visibility,
         title=document.title,
         current_version_number=document.current_version_number,
         created_by=document.created_by,

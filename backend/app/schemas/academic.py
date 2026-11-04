@@ -39,6 +39,7 @@ class SubjectResponse(BaseModel):
     workspace_id: UUID
     name: str
     description: str | None
+    resource_sharing_enabled: bool = False
 
 
 class TopicResponse(BaseModel):
@@ -101,6 +102,8 @@ class DocumentVersionResponse(BaseModel):
 class DocumentResponse(BaseModel):
     id: UUID
     workspace_id: UUID
+    subject_id: UUID | None = None
+    visibility: str = "private"
     title: str
     current_version_number: int
     created_by: UUID

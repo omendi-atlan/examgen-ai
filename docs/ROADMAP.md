@@ -29,10 +29,15 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 
 ### Phase 2 — Academic ingestion and subject intelligence (implementation in progress)
 - [x] Secure workspace-scoped uploads for PDF, DOCX, PPTX, TXT and Markdown.
-- [ ] Deliver resource upload/scan as a native action inside each student's subject/coursework workspace, not as a separate ingestion product or administrative workflow.
-- [ ] Bind every coursework resource to its subject/module and uploader; enforce student ownership and explicit coursework-sharing rules on list, read, version, segment and download operations.
-- [ ] Allow students to upload, scan, view processing status and manage their own resource versions while keeping taxonomy authoring, extraction approval and moderation restricted to authorised staff.
-- [ ] Add end-to-end student-role tests for same-subject uploads, cross-student isolation, cross-subject isolation, version ownership, extraction visibility and staff review access.
+- [x] Add a student-facing coursework dashboard with workspace/subject selection and upload actions; keep resource ingestion inside the subject workflow.
+- [x] Bind coursework resources to the canonical subject and uploader; default visibility to private and require a staff-enabled subject policy for cohort sharing.
+- [x] Add student-scoped upload/list/detail/version/segment APIs while retaining staff-only taxonomy authoring, extraction decisions and governance.
+- [x] Add API integration tests for same-subject upload, private cross-student isolation, cross-subject isolation, uploader-only version ownership, subject discovery and staff-only sharing policy.
+- [x] Add object-authorised original-version download with private/no-store headers and cross-student/cohort-policy isolation tests.
+- [x] Add a browser camera scanner that captures multiple pages, bounds resolution/page count, creates a PDF and sends it through the existing secure upload/OCR pipeline.
+- [x] Add student-visible retry/recovery for terminally failed extraction jobs, restricted to the original uploader and recorded in the audit log.
+- [ ] Add browser-level end-to-end and accessibility tests for upload, camera permissions/capture, progress, extracted content, sharing, download and retry.
+- [ ] Verify the camera scanner and generated PDFs on representative mobile and desktop browsers.
 - [x] Enforce file-size limits, extension allowlists, file signatures, UTF-8 text validation and Office archive structure/expansion limits.
 - [x] Store sources under generated private object keys; never use user filenames as filesystem paths.
 - [x] Record immutable document versions, SHA-256 fingerprints, uploader, source reference/type, publisher and publication date.
@@ -82,6 +87,8 @@ Every phase requires automated tests, documented acceptance criteria, security r
 See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICATION.md) for release gates and deployment caveats.
 
 ## Student coursework resource experience — product requirement
+
+**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Current head `974dd6c0c23e3f3f982b613a71b3927abe24b69a` passes GitHub Actions CI: Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. The dashboard supports upload, multi-page camera-to-PDF capture, processing status, extracted text, version append, authorised download and owner-controlled retry. The PR is not merged or deployed. Browser-level E2E/accessibility and real-device camera qualification remain open.
 
 Academic resource ingestion is a feature inside the student's existing subject/module coursework experience. A student opens a subject or module and uses its normal **Upload resource** or **Scan resource** action to add lecture notes, slides, prescribed readings, worksheets, diagrams or previous assessments. EXAMGEN AI performs validation, malware scanning, extraction/OCR, provenance capture and processing asynchronously in the background. The student sees progress and usable extracted material in that same coursework context. This is not a separate ingestion portal and does not require the student to operate taxonomy or examiner-review tooling.
 
