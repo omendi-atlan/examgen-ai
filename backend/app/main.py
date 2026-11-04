@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.academic import router as academic_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.blueprints import router as blueprints_router
 from app.api.routes.health import router as health_router
 from app.api.routes.student_coursework import router as student_coursework_router
 from app.api.routes.workspaces import router as workspaces_router
@@ -29,4 +30,5 @@ app.include_router(health_router, prefix=settings.api_v1_prefix)
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(workspaces_router, prefix=settings.api_v1_prefix)
 app.include_router(academic_router, prefix=settings.api_v1_prefix)
+app.include_router(blueprints_router, prefix=settings.api_v1_prefix)
 app.include_router(student_coursework_router, prefix=settings.api_v1_prefix)
