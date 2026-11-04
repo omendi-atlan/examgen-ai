@@ -374,6 +374,7 @@ export default function CourseworkResourcesPage() {
         <p style={{ color: "#ff8a35", fontSize: 11, fontWeight: 800, letterSpacing: ".15em" }}>LEARNING MATERIALS</p>
         <h1 style={{ fontSize: "clamp(28px,4vw,40px)", margin: "7px 0" }}>Coursework resources</h1>
         <p style={{ color: "#9aa5b5", lineHeight: 1.6, maxWidth: 760 }}>Upload lecture notes, slides, readings, worksheets, diagrams and previous assessments directly into a subject. Files are scanned and processed in the background; extracted text and OCR status remain attached to each source.</p>
+        <p><Link href="/coursework/questions" style={{ color: "#55d5e8", fontWeight: 700 }}>Build my question bank →</Link></p>
       </section>
 
       <section style={{ ...panel, marginBottom: 16 }}>
