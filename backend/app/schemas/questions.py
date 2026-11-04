@@ -85,7 +85,12 @@ class GeneratedQuestionInput(BaseModel):
                 raise ValueError("Answer option identifiers must be unique.")
             answer_ids = self.correct_answer.get("option_ids")
             if self.question_type == "multiple_select":
-                if not isinstance(answer_ids, list) or not answer_ids or not set(answer_ids) <= set(option_ids):
+                if (
+                    not isinstance(answer_ids, list)
+                    or not answer_ids
+                    or not all(isinstance(item, str) for item in answer_ids)
+                    or not set(answer_ids) <= set(option_ids)
+                ):
                     raise ValueError("Multiple-select answers must reference valid option identifiers.")
             else:
                 answer_id = self.correct_answer.get("option_id")
@@ -95,6 +100,24 @@ class GeneratedQuestionInput(BaseModel):
             raise ValueError("Only objective questions may contain answer options.")
         if not self.correct_answer:
             raise ValueError("A private marking answer is required.")
+        if self.question_type == "fill_blank":
+            accepted = self.correct_answer.get("accepted_answers")
+            if not isinstance(accepted, list) or not accepted or not all(isinstance(item, str) and item.strip() for item in accepted):
+                raise ValueError("Fill-in-the-blank answers require accepted answer strings.")
+        if self.question_type == "numeric":
+            value = self.correct_answer.get("value")
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError("Numeric questions require a numeric answer value.")
+            tolerance = self.correct_answer.get("tolerance", 0)
+            if isinstance(tolerance, bool) or not isinstance(tolerance, (int, float)) or tolerance < 0:
+                raise ValueError("Numeric answer tolerance must be a non-negative number.")
+        if self.question_type in {"short_answer", "long_answer"}:
+            points = self.correct_answer.get("key_points")
+            sample = self.correct_answer.get("sample_answer")
+            if not isinstance(points, list) or not points or not all(isinstance(item, str) and item.strip() for item in points):
+                raise ValueError("Written answers require explicit marking key points.")
+            if not isinstance(sample, str) or not sample.strip():
+                raise ValueError("Written answers require a sample answer.")
         return self
 
 
