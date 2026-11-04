@@ -1,0 +1,47 @@
+name: Cloudflare R2 staging smoke test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r2-staging-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify-r2:
+    name: Verify private R2 upload, read, checksum and cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: r2-staging
+    env:
+      ENVIRONMENT: development
+      DOCUMENT_STORAGE_BACKEND: s3
+      OBJECT_STORAGE_BUCKET: ${{ vars.R2_STAGING_BUCKET }}
+      OBJECT_STORAGE_REGION: auto
+      OBJECT_STORAGE_ENDPOINT_URL: ${{ vars.R2_S3_ENDPOINT }}
+      OBJECT_STORAGE_ACCESS_KEY: ${{ secrets.R2_ACCESS_KEY_ID }}
+      OBJECT_STORAGE_SECRET_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Validate staging configuration without printing credentials
+        shell: bash
+        run: |
+          test -n "$OBJECT_STORAGE_BUCKET" || { echo "Missing environment variable R2_STAGING_BUCKET"; exit 1; }
+          test -n "$OBJECT_STORAGE_ENDPOINT_URL" || { echo "Missing environment variable R2_S3_ENDPOINT"; exit 1; }
+          test -n "$OBJECT_STORAGE_ACCESS_KEY" || { echo "Missing environment secret R2_ACCESS_KEY_ID"; exit 1; }
+          test -n "$OBJECT_STORAGE_SECRET_KEY" || { echo "Missing environment secret R2_SECRET_ACCESS_KEY"; exit 1; }
+          case "$OBJECT_STORAGE_ENDPOINT_URL" in
+            https://*.r2.cloudflarestorage.com) ;;
+            *) echo "R2_S3_ENDPOINT must be a Cloudflare R2 HTTPS S3 endpoint"; exit 1 ;;
+          esac
+      - name: Install API storage adapter
+        run: python -m pip install --upgrade pip && python -m pip install .
+      - name: Run real Cloudflare R2 smoke test
+        run: python backend/scripts/verify_object_storage.py
