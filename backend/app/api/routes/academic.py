@@ -1,6 +1,7 @@
 """Workspace-scoped academic source ingestion and classification routes."""
 
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
@@ -52,6 +53,7 @@ WorkspaceEditor = Annotated[
             MembershipRole.OWNER,
             MembershipRole.ADMIN,
             MembershipRole.EXAMINER,
+            MembershipRole.MODERATOR,
         )
     ),
 ]
@@ -150,7 +152,7 @@ async def _ingest_version(
     source_type: str | None,
     source_reference: str | None,
     publisher: str | None,
-    published_on: object | None,
+    published_on: date | None,
 ) -> DocumentVersion:
     settings = get_settings()
     stored = await store_upload(
@@ -275,7 +277,7 @@ async def upload_academic_document(
     source_type: Annotated[str | None, Form(max_length=80)] = None,
     source_reference: Annotated[str | None, Form(max_length=1000)] = None,
     publisher: Annotated[str | None, Form(max_length=240)] = None,
-    published_on: Annotated[str | None, Form()] = None,
+    published_on: Annotated[date | None, Form()] = None,
 ) -> DocumentResponse:
     """Create a logical document, immutable version one and its extraction record."""
     clean_title = title.strip()
@@ -448,20 +450,20 @@ def create_subject(
     )
     db.add(subject)
     try:
+        db.flush()
+        record_audit_event(
+            db,
+            action="taxonomy.subject_created",
+            resource_type="subject",
+            resource_id=str(subject.id),
+            actor_user_id=membership.user_id,
+            workspace_id=workspace_id,
+        )
         db.commit()
         db.refresh(subject)
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Subject already exists in this workspace.") from None
-    record_audit_event(
-        db,
-        action="taxonomy.subject_created",
-        resource_type="subject",
-        resource_id=str(subject.id),
-        actor_user_id=membership.user_id,
-        workspace_id=workspace_id,
-    )
-    db.commit()
     return subject
 
 
@@ -514,20 +516,20 @@ def create_topic(
     )
     db.add(topic)
     try:
+        db.flush()
+        record_audit_event(
+            db,
+            action="taxonomy.topic_created",
+            resource_type="topic",
+            resource_id=str(topic.id),
+            actor_user_id=membership.user_id,
+            workspace_id=workspace_id,
+        )
         db.commit()
         db.refresh(topic)
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Topic already exists under this subject.") from None
-    record_audit_event(
-        db,
-        action="taxonomy.topic_created",
-        resource_type="topic",
-        resource_id=str(topic.id),
-        actor_user_id=membership.user_id,
-        workspace_id=workspace_id,
-    )
-    db.commit()
     return topic
 
 
@@ -613,6 +615,7 @@ def classify_document_version(
         for topic in topics
     ]
     db.add_all(assignments)
+    db.flush()
     record_audit_event(
         db,
         action="academic_document.classified",
