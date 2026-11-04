@@ -31,10 +31,15 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Persist extraction status, parser identity/version, metadata and addressable text segments.
 - [x] Establish explicit workspace-owned subject/topic taxonomy and human-confirmed version classification.
 - [x] Add page-level OCR fallback for image-only PDF pages using PDFium and Tesseract, retaining page locators and OCR provenance.
-- [ ] Add malware scanning and managed object-storage adapter.
+- [x] Add fail-closed ClamAV scanning before permanent upload acceptance; production startup requires scanning to be enabled.
+- [ ] Add a managed object-storage adapter.
 - [x] Add a durable database-backed extraction queue and separately deployed worker process.
-- [ ] Add PostgreSQL multi-worker integration tests, a dedicated examiner review UI and source-citation acceptance tests.
+- [x] Add PostgreSQL 16 CI migrations and multi-worker claim/lease-recovery integration tests.
+- [x] Add a dedicated examiner review UI for source versions, extraction quality and source-addressable segments.
+- [ ] Add source-citation acceptance tests and examiner extraction accept/reject workflow.
 - [x] Persist extraction quality signals; extraction is never automatically approved.
+- [x] Enforce PDF page, OCR pixel/time, presentation slide, Office archive expansion/ratio and extracted-character limits.
+- [x] Add expiring worker leases, attempt accounting, expired-job recovery and fencing tokens to prevent stale workers committing results.
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
 - Blueprint constraints, question lifecycle, provenance, deduplication, model answers and rubrics.

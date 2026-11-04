@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
 
+from app.services.malware_scanning import MalwareDetectedError, scan_file
+
 SUPPORTED_TYPES = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -17,7 +19,7 @@ SUPPORTED_TYPES = {
     ".txt": "text/plain",
     ".md": "text/markdown",
 }
-MAX_ARCHIVE_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+MAX_ARCHIVE_UNCOMPRESSED_BYTES = 80 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 5000
 
 
@@ -29,9 +31,10 @@ class StoredUpload:
     media_type: str
     size_bytes: int
     sha256: str
+    malware_scan: dict[str, str | bool]
 
 
-def _validate_package(path: Path, extension: str) -> None:
+def _validate_package(path: Path, extension: str, max_compression_ratio: int) -> None:
     """Reject malformed, encrypted, oversized or mismatched Office packages."""
     expected = {
         ".docx": "word/document.xml",
@@ -46,6 +49,14 @@ def _validate_package(path: Path, extension: str) -> None:
                 raise ValueError("Office package expands beyond the permitted size.")
             if any(item.flag_bits & 0x1 for item in entries):
                 raise ValueError("Encrypted Office packages are not accepted.")
+            if any(
+                (item.file_size > 0 and item.compress_size == 0)
+                or (item.compress_size > 0 and item.file_size / item.compress_size > max_compression_ratio)
+                for item in entries
+            ):
+                raise ValueError("Office package compression ratio exceeds the permitted limit.")
+            if any(((item.external_attr >> 16) & 0o170000) == 0o120000 for item in entries):
+                raise ValueError("Office packages containing symbolic links are not accepted.")
             if expected not in archive.namelist():
                 raise ValueError("Office package does not match its declared file type.")
             if "[Content_Types].xml" not in archive.namelist():
@@ -80,7 +91,7 @@ async def store_upload(
                 size += len(chunk)
                 if size > max_bytes:
                     raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                         detail="Upload exceeds the configured size limit.",
                     )
                 digest.update(chunk)
@@ -98,7 +109,9 @@ async def store_upload(
             if not signature.startswith(b"PK"):
                 raise HTTPException(status_code=415, detail="File content is not a valid Office package.")
             try:
-                _validate_package(temporary_path, extension)
+                from app.core.config import get_settings
+
+                _validate_package(temporary_path, extension, get_settings().max_office_archive_ratio)
             except ValueError as exc:
                 raise HTTPException(status_code=415, detail=str(exc)) from exc
         if extension in {".txt", ".md"}:
@@ -106,6 +119,16 @@ async def store_upload(
                 temporary_path.read_text(encoding="utf-8")
             except UnicodeDecodeError as exc:
                 raise HTTPException(status_code=415, detail="Text files must use UTF-8 encoding.") from exc
+
+        try:
+            malware_scan = scan_file(temporary_path)
+        except MalwareDetectedError as exc:
+            raise HTTPException(status_code=422, detail="Upload rejected: malicious content detected.") from exc
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Malware scanning is unavailable; upload rejected.",
+            ) from exc
 
         object_id = uuid4().hex
         storage_key = f"{object_id[:2]}/{object_id}{extension}"
@@ -120,6 +143,7 @@ async def store_upload(
             media_type=SUPPORTED_TYPES[extension],
             size_bytes=size,
             sha256=digest.hexdigest(),
+            malware_scan=malware_scan,
         )
     finally:
         if temporary_path is not None:
