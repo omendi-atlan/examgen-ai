@@ -8,6 +8,7 @@
     subjectId: "",
     examId: "",
     activeAttempt: null,
+    submitting: false,
     responses: {},
     saveTimers: new Map(),
     savePromises: new Map(),
@@ -290,7 +291,9 @@
   async function submitAttempt() {
     const attempt = state.activeAttempt;
     if (!attempt || attempt.status !== "in_progress") return;
+    state.submitting = true;
     byId("submit-button").disabled = true;
+    renderAttempt();
     try {
       await flushResponses();
       const result = await api(
@@ -307,13 +310,15 @@
       setStatus(error.message || "Submission failed.", true);
       await openAttempt(attempt.id);
     } finally {
+      state.submitting = false;
       byId("submit-button").disabled = false;
+      if (state.activeAttempt?.status === "in_progress") renderAttempt();
     }
   }
 
   function renderResponse(question, card) {
     const response = state.responses[question.exam_question_id] || {};
-    const disabled = state.activeAttempt.status !== "in_progress";
+    const disabled = state.activeAttempt.status !== "in_progress" || state.submitting;
     const options = question.options || [];
     const update = (next) => updateResponse(question.exam_question_id, next);
     if (["multiple_choice", "true_false"].includes(question.question_type)) {
