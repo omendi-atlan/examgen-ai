@@ -188,6 +188,7 @@ async def _ingest_version(
             "ingestion_channel": "authenticated_workspace_upload",
             "original_filename": stored.original_filename,
             "sha256": stored.sha256,
+            "malware_scan": stored.malware_scan,
         },
         uploaded_by=uploaded_by,
     )
