@@ -59,7 +59,9 @@ class Settings(BaseSettings):
             raise ValueError("DOCUMENT_STORAGE_BACKEND must be local or s3.")
         if self.document_storage_backend == "s3" and not self.object_storage_bucket:
             raise ValueError("OBJECT_STORAGE_BUCKET is required when S3 storage is enabled.")
-        if self.document_storage_backend == "s3" and bool(self.object_storage_access_key) != bool(self.object_storage_secret_key):
+        access_key_set = bool(self.object_storage_access_key and self.object_storage_access_key.get_secret_value())
+        secret_key_set = bool(self.object_storage_secret_key and self.object_storage_secret_key.get_secret_value())
+        if self.document_storage_backend == "s3" and access_key_set != secret_key_set:
             raise ValueError("S3 access key and secret key must be configured together.")
         if not 1 <= self.access_token_ttl_minutes <= 60:
             raise ValueError("ACCESS_TOKEN_TTL_MINUTES must be between 1 and 60.")
