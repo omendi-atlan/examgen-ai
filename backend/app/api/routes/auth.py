@@ -1,5 +1,7 @@
 """Registration, login and current-user endpoints."""
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -13,6 +15,8 @@ from app.schemas.identity import LoginRequest, RegisterRequest, TokenResponse, U
 from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/auth", tags=["identity"])
+DatabaseSession = Annotated[Session, Depends(get_db)]
+AuthenticatedUser = Annotated[User, Depends(get_current_user)]
 
 
 @router.post(
@@ -20,7 +24,7 @@ router = APIRouter(prefix="/auth", tags=["identity"])
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
+def register(payload: RegisterRequest, db: DatabaseSession) -> User:
     """Create a user account; passwords are never stored or returned in plaintext."""
     user = User(
         email=payload.email,
@@ -46,7 +50,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(payload: LoginRequest, db: DatabaseSession) -> TokenResponse:
     """Authenticate credentials and return a short-lived signed access token."""
     user = db.scalar(select(User).where(User.email == payload.email))
     if (
@@ -73,8 +77,6 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
 
 
 @router.get("/me", response_model=UserResponse)
-def read_current_user(
-    current_user: User = Depends(get_current_user),
-) -> User:
+def read_current_user(current_user: AuthenticatedUser) -> User:
     """Return the authenticated user's public profile."""
     return current_user
