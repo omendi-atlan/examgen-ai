@@ -67,6 +67,7 @@ def create_workspace_and_taxonomy(client: TestClient, label: str = "blueprint") 
     )
     assert subject.status_code == 201
     topics = []
+    outcomes = []
     for name in ("Requirements Engineering", "Software Testing"):
         topic = client.post(
             f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects/{subject.json()['id']}/topics",
@@ -75,12 +76,20 @@ def create_workspace_and_taxonomy(client: TestClient, label: str = "blueprint") 
         )
         assert topic.status_code == 201
         topics.append(topic.json()["id"])
+        outcome = client.post(
+            f"/api/v1/workspaces/{workspace_id}/taxonomy/topics/{topic.json()['id']}/learning-outcomes",
+            headers=headers,
+            json={"code": f"LO-{len(outcomes) + 1}", "description": f"Demonstrate {name.lower()} concepts."},
+        )
+        assert outcome.status_code == 201
+        outcomes.append(outcome.json()["id"])
     return {
         "token": token,
         "headers": headers,
         "workspace_id": workspace_id,
         "subject_id": subject.json()["id"],
         "topic_ids": topics,
+        "outcome_ids": outcomes,
     }
 
 
@@ -103,6 +112,10 @@ def blueprint_payload(context: dict, *, total_marks: int = 100, title: str = "Se
         },
         "difficulty_distribution": {"easy": 20, "medium": 60, "hard": 20},
         "question_type_distribution": {"multiple_choice": 40, "short_answer": 60},
+        "outcome_weights": [
+            {"learning_outcome_id": context["outcome_ids"][0], "target_marks": first},
+            {"learning_outcome_id": context["outcome_ids"][1], "target_marks": total_marks - first},
+        ],
         "topic_weights": [
             {"topic_id": context["topic_ids"][0], "target_marks": first},
             {"topic_id": context["topic_ids"][1], "target_marks": total_marks - first},
@@ -126,6 +139,7 @@ def test_blueprint_create_append_and_approve_preserves_immutable_versions(
     assert first["version_number"] == 1
     assert first["status"] == "draft"
     assert sum(item["target_marks"] for item in first["topic_weights"]) == 100
+    assert sum(item["target_marks"] for item in first["outcome_weights"]) == 100
 
     appended = client.post(
         f"/api/v1/workspaces/{context['workspace_id']}/blueprints/{blueprint['id']}/versions",
@@ -196,6 +210,7 @@ def test_blueprint_rejects_topic_from_another_workspace(client: TestClient) -> N
     outsider = create_workspace_and_taxonomy(client, "outsider")
     payload = blueprint_payload(owner)
     payload["topic_weights"][0]["topic_id"] = outsider["topic_ids"][0]
+    payload["outcome_weights"][0]["learning_outcome_id"] = outsider["outcome_ids"][0]
 
     rejected = client.post(
         f"/api/v1/workspaces/{owner['workspace_id']}/blueprints",
@@ -240,3 +255,17 @@ def test_blueprint_is_workspace_isolated_and_students_cannot_approve(client: Tes
         headers=context["headers"],
     )
     assert forbidden.status_code == 403
+
+
+def test_blueprint_rejects_incomplete_learning_outcome_mark_coverage(
+    client: TestClient,
+) -> None:
+    context = create_workspace_and_taxonomy(client, "outcome-coverage")
+    payload = blueprint_payload(context)
+    payload["outcome_weights"][0]["target_marks"] = 49
+    rejected = client.post(
+        f"/api/v1/workspaces/{context['workspace_id']}/blueprints",
+        headers=context["headers"],
+        json=payload,
+    )
+    assert rejected.status_code == 422
