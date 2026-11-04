@@ -4,7 +4,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr \\\n    && rm -rf /var/lib/apt/lists/*\n\nWORKDIR /srv/examgen
+RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srv/examgen
 COPY pyproject.toml ./
 COPY alembic.ini ./
 COPY backend ./backend
