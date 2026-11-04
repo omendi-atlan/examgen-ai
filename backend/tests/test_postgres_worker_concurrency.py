@@ -7,18 +7,23 @@ from uuid import UUID, uuid4
 
 import pytest
 from app.api.dependencies import enforce_auth_rate_limit, get_db
-from app.core.config import get_settings\nfrom app.core.database import Base\nfrom app.main import app\nfrom app.services import document_storage
+from app.core.config import get_settings
+from app.core.database import Base
+from app.main import app
 from app.models import (
     AcademicDocument,
     DocumentProcessingJob,
     DocumentVersion,
     ExtractionJobStatus,
+    MembershipRole,
     User,
     Workspace,
+    WorkspaceMembership,
 )
-from app.services import document_processing
+from app.services import document_processing, document_storage
 from app.services.document_processing import claim_next_job, recover_expired_jobs
-from fastapi import HTTPException\nfrom fastapi.testclient import TestClient
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.requests import Request
