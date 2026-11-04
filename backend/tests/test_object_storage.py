@@ -1,6 +1,5 @@
 """Storage adapter tests for local persistence and S3-compatible object operations."""
 import hashlib
-import shutil
 from pathlib import Path
 
 import pytest
