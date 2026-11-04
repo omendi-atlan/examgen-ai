@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from sqlalchemy import (
     JSON,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -33,6 +34,7 @@ class ExamBlueprint(Base):
     __tablename__ = "exam_blueprints"
     __table_args__ = (
         Index("ix_exam_blueprints_workspace_updated", "workspace_id", "updated_at"),
+        CheckConstraint("current_version_number >= 0", name="ck_exam_blueprint_current_version"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -63,6 +65,12 @@ class ExamBlueprintVersion(Base):
     __table_args__ = (
         UniqueConstraint("blueprint_id", "version_number", name="uq_blueprint_version_number"),
         Index("ix_blueprint_versions_subject_created", "subject_id", "created_at"),
+        CheckConstraint("version_number > 0", name="ck_blueprint_version_number_positive"),
+        CheckConstraint("duration_minutes BETWEEN 1 AND 600", name="ck_blueprint_duration_range"),
+        CheckConstraint("total_marks BETWEEN 1 AND 1000", name="ck_blueprint_total_marks_range"),
+        CheckConstraint("question_count BETWEEN 1 AND 200", name="ck_blueprint_question_count_range"),
+        CheckConstraint("question_count <= total_marks", name="ck_blueprint_question_count_marks"),
+        CheckConstraint("status IN ('draft', 'approved')", name="ck_blueprint_version_status"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -116,6 +124,7 @@ class BlueprintTopicWeight(Base):
     __table_args__ = (
         UniqueConstraint("version_id", "topic_id", name="uq_blueprint_version_topic_weight"),
         Index("ix_blueprint_topic_weights_topic", "topic_id"),
+        CheckConstraint("target_marks > 0", name="ck_blueprint_topic_target_marks_positive"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
