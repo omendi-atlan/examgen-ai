@@ -77,6 +77,7 @@ class ExtractionResponse(BaseModel):
     character_count: int
     segment_count: int
     error_message: str | None
+    quality_report: dict[str, object] = Field(default_factory=dict)
 
 
 class DocumentVersionResponse(BaseModel):
