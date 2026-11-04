@@ -5,9 +5,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+import app.models  # noqa: F401 — register model metadata for autogeneration
 from app.core.config import get_settings
 from app.core.database import Base
-import app.models  # noqa: F401 — register model metadata for autogeneration
 
 config = context.config
 if config.config_file_name is not None:
