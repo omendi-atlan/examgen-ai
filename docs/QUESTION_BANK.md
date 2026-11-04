@@ -21,7 +21,7 @@ AI generation creates **private draft questions** for the requesting workspace m
 
 Generation requires an approved blueprint version and selected, accessible, successfully extracted source versions. The server sends source material to the configured provider as untrusted data and explicitly instructs the model to ignore embedded instructions.
 
-The provider response is validated before any question is persisted:
+The provider response is validated before any question is persisted. Synchronous generation is capped at 30 questions per request and 10 requests per account per hour:
 - exact question count and total marks;
 - exact topic and learning-outcome mark allocations;
 - integer mark allocations derived deterministically from cognitive, difficulty and question-type percentages;
