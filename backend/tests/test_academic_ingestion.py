@@ -790,6 +790,7 @@ def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled
     )
     assert shared.status_code == 201, shared.text
     resource_id = shared.json()["id"]
+    version_id = shared.json()["versions"][0]["id"]
 
     visible = client.get(
         f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
@@ -797,6 +798,13 @@ def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled
     )
     assert visible.status_code == 200
     assert resource_id in [item["id"] for item in visible.json()]
+    shared_download = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/"
+        f"{resource_id}/versions/{version_id}/download",
+        headers=second_headers,
+    )
+    assert shared_download.status_code == 200
+    assert shared_download.content == b"Notes shared by the lecturer-approved cohort policy."
 
     student_policy_denied = client.put(
         f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
@@ -827,6 +835,12 @@ def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled
         headers=second_headers,
     )
     assert hidden.status_code == 404
+    hidden_download = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/"
+        f"{resource_id}/versions/{version_id}/download",
+        headers=second_headers,
+    )
+    assert hidden_download.status_code == 404
 
 
 def test_coursework_download_is_object_authorised_and_checksum_verified(client: TestClient) -> None:
@@ -957,6 +971,16 @@ def test_student_can_retry_only_their_failed_coursework_extraction(client: TestC
     # A second retry is rejected while the worker queue is already active.
     duplicate_retry = client.post(retry_url, headers=headers)
     assert duplicate_retry.status_code == 409
+
+    # Recreate a terminal failure to prove a different student cannot retry it.
+    with Session(app.state.test_engine) as db:
+        job = db.scalar(select(DocumentProcessingJob).where(DocumentProcessingJob.version_id == UUID(version_id)))
+        extraction = db.scalar(select(DocumentExtraction).where(DocumentExtraction.version_id == UUID(version_id)))
+        assert job is not None and extraction is not None
+        job.status = ExtractionJobStatus.FAILED
+        job.attempts = job.max_attempts
+        extraction.status = ExtractionStatus.FAILED
+        db.commit()
 
     with Session(app.state.test_engine) as db:
         membership = db.scalar(
