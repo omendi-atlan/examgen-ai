@@ -293,3 +293,25 @@ class DocumentProcessingJob(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     version: Mapped[DocumentVersion] = relationship()
+
+
+class DocumentExtractionReview(Base):
+    """Append-only human decision on whether extracted source content is fit for use."""
+
+    __tablename__ = "document_extraction_reviews"
+    __table_args__ = (
+        Index("ix_extraction_reviews_version_created", "version_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("document_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    reviewed_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

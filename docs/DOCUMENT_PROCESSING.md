@@ -56,3 +56,13 @@
 ## Quality review
 
 The persisted quality report contains character count, page count, segment count, outcome and reasons. Low text density is a heuristic that flags a document for human review; it must not be treated as proof of missing content. OCR output retains page locators and is labelled as OCR-derived metadata. Academic content remains untrusted data, never executable instructions.
+
+
+## Examiner extraction review
+
+Extraction completion is not approval. Workspace owners, administrators, examiners and moderators may append an explicit decision to a completed source version through:
+
+- `POST /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews`
+- `GET /api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews`
+
+The request requires `decision` (`accepted` or `rejected`) and a meaningful rationale. Decisions are append-only, workspace-scoped, and transactionally paired with audit events. Queued or processing extractions cannot be reviewed. Acceptance requires non-empty extracted text; a source requiring OCR, an empty extraction or a failed extraction must be rejected or reprocessed rather than accepted. Re-review creates a new history record and does not erase prior decisions.

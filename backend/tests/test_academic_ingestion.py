@@ -262,3 +262,89 @@ def test_upload_creates_one_durable_job_per_immutable_version(client: TestClient
         ).all()
         assert len(jobs) == 1
         assert jobs[0].status.value == "queued"
+
+
+def test_extraction_review_is_human_audited_and_append_only(client: TestClient) -> None:
+    from app.models import AuditEvent, DocumentExtractionReview
+
+    token, workspace_id = create_workspace(client, "reviewer@example.test")
+    headers = {"Authorization": f"Bearer {token}"}
+    uploaded = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers=headers,
+        data={"title": "Reviewable course notes"},
+        files={"file": ("notes.txt", b"Core learning outcomes and assessment concepts.", "text/plain")},
+    )
+    assert uploaded.status_code == 201
+    document_id = uploaded.json()["id"]
+    version_id = uploaded.json()["versions"][0]["id"]
+
+    queued_review = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+        headers=headers,
+        json={"decision": "accepted", "rationale": "Looks suitable."},
+    )
+    assert queued_review.status_code == 409
+
+    with Session(app.state.test_engine) as db:
+        job_id = claim_next_job(db)
+        assert job_id is not None
+        assert process_job(db, job_id) is True
+
+    rejected = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+        headers=headers,
+        json={"decision": "rejected", "rationale": "Please verify the source formatting."},
+    )
+    assert rejected.status_code == 201
+    assert rejected.json()["decision"] == "rejected"
+
+    accepted = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+        headers=headers,
+        json={"decision": "accepted", "rationale": "Reviewed against the original source."},
+    )
+    assert accepted.status_code == 201
+    history = client.get(
+        f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+        headers=headers,
+    )
+    assert history.status_code == 200
+    assert sorted(item["decision"] for item in history.json()) == ["accepted", "rejected"]
+
+    with Session(app.state.test_engine) as db:
+        reviews = db.scalars(
+            select(DocumentExtractionReview).where(DocumentExtractionReview.version_id == UUID(version_id))
+        ).all()
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.workspace_id == UUID(workspace_id),
+                AuditEvent.resource_id == version_id,
+                AuditEvent.action.in_([
+                    "academic_document.extraction_rejected",
+                    "academic_document.extraction_accepted",
+                ]),
+            )
+        ).all()
+        assert len(reviews) == 2
+        assert len(events) == 2
+
+
+def test_extraction_review_is_workspace_isolated(client: TestClient) -> None:
+    owner_token, workspace_id = create_workspace(client, "review-owner@example.test")
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    uploaded = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers=owner_headers,
+        data={"title": "Private review source"},
+        files={"file": ("private.txt", b"Private source material", "text/plain")},
+    )
+    document_id = uploaded.json()["id"]
+    version_id = uploaded.json()["versions"][0]["id"]
+
+    outsider_token, _ = create_workspace(client, "review-outsider@example.test")
+    denied = client.get(
+        f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+        headers={"Authorization": f"Bearer {outsider_token}"},
+    )
+    assert denied.status_code == 404

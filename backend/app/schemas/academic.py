@@ -115,3 +115,27 @@ class TextSegmentResponse(BaseModel):
     locator: str
     text: str
     metadata: dict[str, object]
+
+
+class ExtractionReviewRequest(BaseModel):
+    decision: str = Field(pattern="^(accepted|rejected)$")
+    rationale: str = Field(min_length=3, max_length=4000)
+
+    @field_validator("rationale")
+    @classmethod
+    def clean_rationale(cls, value: str) -> str:
+        result = value.strip()
+        if len(result) < 3:
+            raise ValueError("A meaningful review rationale is required.")
+        return result
+
+
+class ExtractionReviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    version_id: UUID
+    decision: str
+    rationale: str
+    reviewed_by: UUID
+    created_at: datetime
