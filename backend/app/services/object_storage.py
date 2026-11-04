@@ -32,10 +32,12 @@ def _s3_client():
     options: dict[str, object] = {"region_name": settings.object_storage_region}
     if settings.object_storage_endpoint_url:
         options["endpoint_url"] = settings.object_storage_endpoint_url
-    if settings.object_storage_access_key:
-        options["aws_access_key_id"] = settings.object_storage_access_key.get_secret_value()
-    if settings.object_storage_secret_key:
-        options["aws_secret_access_key"] = settings.object_storage_secret_key.get_secret_value()
+    access_key = settings.object_storage_access_key.get_secret_value() if settings.object_storage_access_key else ""
+    secret_key = settings.object_storage_secret_key.get_secret_value() if settings.object_storage_secret_key else ""
+    if access_key:
+        options["aws_access_key_id"] = access_key
+    if secret_key:
+        options["aws_secret_access_key"] = secret_key
     return boto3.client("s3", **options)
 
 
