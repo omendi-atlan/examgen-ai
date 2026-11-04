@@ -1,6 +1,6 @@
 """Private local and S3-compatible object storage adapters.
 
-Object keys remain opaque and stable in PostgreSQL. S3 buckets must be private;
+Object keys remain opaque and stable in PostgreSQL. Buckets must be private;
 credentials are read only by the server-side API and worker processes.
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 from app.core.config import get_settings
 
@@ -21,6 +22,12 @@ def _safe_key(key: str) -> str:
     if "\\" in key or key.startswith("/"):
         raise ValueError("Invalid document storage key.")
     return key
+
+
+def _is_cloudflare_r2(endpoint_url: str | None) -> bool:
+    """R2 encrypts objects at rest itself and rejects the AWS SSE request header."""
+    hostname = urlparse(endpoint_url or "").hostname or ""
+    return hostname == "r2.cloudflarestorage.com" or hostname.endswith(".r2.cloudflarestorage.com")
 
 
 def _s3_client():
@@ -61,14 +68,16 @@ def persist_file(source: Path, storage_key: str) -> None:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest_state.update(chunk)
     digest = digest_state.hexdigest()
+    extra_args: dict[str, object] = {"Metadata": {"sha256": digest}}
+    # Cloudflare R2 automatically encrypts data at rest with AES-256 and its S3
+    # API does not implement x-amz-server-side-encryption on PutObject.
+    if not _is_cloudflare_r2(settings.object_storage_endpoint_url):
+        extra_args["ServerSideEncryption"] = "AES256"
     client.upload_file(
         str(source),
         settings.object_storage_bucket,
         key,
-        ExtraArgs={
-            "ServerSideEncryption": "AES256",
-            "Metadata": {"sha256": digest},
-        },
+        ExtraArgs=extra_args,
     )
     head = client.head_object(Bucket=settings.object_storage_bucket, Key=key)
     if head.get("ContentLength") != source.stat().st_size or head.get("Metadata", {}).get("sha256") != digest:
