@@ -5,12 +5,11 @@ extraction queue, storage, provenance and audit services. It does not create a
 second document store or expose examiner governance operations to students.
 """
 from datetime import date
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
