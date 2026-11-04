@@ -624,9 +624,13 @@ async def test_openai_adapter_uses_server_secret_and_validates_structured_respon
             },
         )
 
+    class MockAsyncTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            return provider(request)
+
     service = QuestionGenerationService(
         Settings(openai_api_key=SecretStr("test-provider-secret")),
-        transport=httpx.MockTransport(provider),
+        transport=MockAsyncTransport(),
     )
     result = await service.generate(
         blueprint_version=blueprint,
