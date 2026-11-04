@@ -36,10 +36,12 @@ def settings(tmp_path):
         "document_storage_backend": config.document_storage_backend,
         "document_storage_path": config.document_storage_path,
         "object_storage_bucket": config.object_storage_bucket,
+        "object_storage_endpoint_url": config.object_storage_endpoint_url,
     }
     config.document_storage_path = str(tmp_path / "private")
     config.document_storage_backend = "local"
     config.object_storage_bucket = None
+    config.object_storage_endpoint_url = None
     yield config
     for key, value in previous.items():
         setattr(config, key, value)
@@ -87,6 +89,30 @@ def test_s3_round_trip_verifies_checksum_and_uses_private_server_encryption(
         temporary_path = downloaded
     assert not temporary_path.exists()
 
+    object_storage.delete_file(key)
+    assert ("examgen-private", key) not in fake.objects
+
+
+def test_r2_round_trip_omits_unsupported_sse_header_and_keeps_checksum(settings, monkeypatch, tmp_path):
+    fake = FakeS3()
+    settings.document_storage_backend = "s3"
+    settings.object_storage_bucket = "examgen-private"
+    settings.object_storage_endpoint_url = "https://account-id.r2.cloudflarestorage.com"
+    settings.object_storage_region = "auto"
+    monkeypatch.setattr(object_storage, "_s3_client", lambda: fake)
+
+    source = tmp_path / "r2-upload.txt"
+    payload = b"Cloudflare R2 private coursework resource"
+    source.write_bytes(payload)
+    key = "health-checks/r2-object.txt"
+
+    object_storage.persist_file(source, key)
+    assert "ServerSideEncryption" not in fake.upload_args
+    assert fake.upload_args["Metadata"]["sha256"] == hashlib.sha256(payload).hexdigest()
+    with object_storage.open_storage_file(
+        key, expected_size=len(payload), expected_sha256=hashlib.sha256(payload).hexdigest()
+    ) as downloaded:
+        assert downloaded.read_bytes() == payload
     object_storage.delete_file(key)
     assert ("examgen-private", key) not in fake.objects
 
