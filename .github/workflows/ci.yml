@@ -15,10 +15,13 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: npm audit --audit-level=high
       - run: touch .env && docker compose config --quiet
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
   validate-python:
     runs-on: ubuntu-latest

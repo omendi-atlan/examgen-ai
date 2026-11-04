@@ -36,7 +36,8 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Add object-authorised original-version download with private/no-store headers and cross-student/cohort-policy isolation tests.
 - [x] Add a browser camera scanner that captures multiple pages, bounds resolution/page count, creates a PDF and sends it through the existing secure upload/OCR pipeline.
 - [x] Add student-visible retry/recovery for terminally failed extraction jobs, restricted to the original uploader and recorded in the audit log.
-- [ ] Add browser-level end-to-end and accessibility tests for upload, camera permissions/capture, progress, extracted content, sharing, download and retry.
+- [x] Add Playwright browser acceptance tests for student sign-in, workspace/subject selection, resource upload, extracted text, download, version append, failed-extraction retry, default-private sharing controls and camera capture-to-PDF preparation.
+- [ ] Expand browser tests against a real API/database staging environment and complete a WCAG 2.2 AA/assistive-technology audit.
 - [ ] Verify the camera scanner and generated PDFs on representative mobile and desktop browsers.
 - [x] Enforce file-size limits, extension allowlists, file signatures, UTF-8 text validation and Office archive structure/expansion limits.
 - [x] Store sources under generated private object keys; never use user filenames as filesystem paths.
@@ -88,7 +89,7 @@ See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICA
 
 ## Student coursework resource experience — product requirement
 
-**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Current head `974dd6c0c23e3f3f982b613a71b3927abe24b69a` passes GitHub Actions CI: Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. The dashboard supports upload, multi-page camera-to-PDF capture, processing status, extracted text, version append, authorised download and owner-controlled retry. The PR is not merged or deployed. Browser-level E2E/accessibility and real-device camera qualification remain open.
+**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Its inspected CI run passed Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. Draft PR #26 adds Playwright browser qualification; its initial browser run passed all 3 scenarios (resource lifecycle, failed-extraction retry/default-private controls, and camera capture-to-PDF using Chromium's fake camera). The browser suite mocks the API and is not a live staging qualification. PR #26 also adds a production-dependency high-severity npm audit gate; that latest CI run must finish before this qualification milestone is declared complete. Both PRs remain unmerged and undeployed. Real-device camera, full accessibility and live staging qualification remain open.
 
 Academic resource ingestion is a feature inside the student's existing subject/module coursework experience. A student opens a subject or module and uses its normal **Upload resource** or **Scan resource** action to add lecture notes, slides, prescribed readings, worksheets, diagrams or previous assessments. EXAMGEN AI performs validation, malware scanning, extraction/OCR, provenance capture and processing asynchronously in the background. The student sees progress and usable extracted material in that same coursework context. This is not a separate ingestion portal and does not require the student to operate taxonomy or examiner-review tooling.
 
