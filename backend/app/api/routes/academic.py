@@ -163,7 +163,6 @@ async def _ingest_version(
         Path(settings.document_storage_path),
         settings.max_document_upload_bytes,
     )
-    storage_key = stored.storage_key
     existing = db.scalar(
         select(DocumentVersion).where(
             DocumentVersion.document_id == document.id,
