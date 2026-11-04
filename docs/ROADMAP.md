@@ -19,7 +19,7 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Add canonical user, workspace, membership and audit-event models.
 - [x] Add the reviewed identity and audit migration.
 - [x] Add registration, login, short-lived signed access tokens and workspace membership enforcement.
-- [x] Add shared PostgreSQL-backed login and registration rate limiting with 429/Retry-After responses and concurrent atomicity tests.
+- [x] Add shared PostgreSQL-backed login, registration and academic upload rate limiting with 429/Retry-After responses and concurrent atomicity tests.
 - [x] Add role-based ingestion authorization, cross-workspace taxonomy isolation and fail-closed production configuration tests.
 - [x] Add PostgreSQL-backed cross-tenant document access, taxonomy isolation and role-authorization integration tests.
 - [x] Complete the route-by-route academic authorization and tenant-isolation matrix for upload, version, document, segment, taxonomy, classification and extraction-review endpoints.

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import require_workspace_roles
+from app.api.dependencies import limit_document_upload_attempts, require_workspace_roles
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import (
@@ -253,6 +253,7 @@ async def _ingest_version(
     "/workspaces/{workspace_id}/documents",
     response_model=DocumentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_document_upload_attempts)],
 )
 async def upload_academic_document(
     workspace_id: UUID,
@@ -301,6 +302,7 @@ async def upload_academic_document(
     "/workspaces/{workspace_id}/documents/{document_id}/versions",
     response_model=DocumentResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_document_upload_attempts)],
 )
 async def upload_document_version(
     workspace_id: UUID,
