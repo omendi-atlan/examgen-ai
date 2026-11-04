@@ -1,15 +1,15 @@
 """Academic ingestion, provenance, extraction and taxonomy API tests."""
 
 import pytest
+
+from app.core.config import get_settings
+from app.core.database import Base, get_db
+from app.main import app
 from docx import Document as WordDocument
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
-
-from app.core.config import get_settings
-from app.core.database import Base, get_db
-from app.main import app
 
 
 @pytest.fixture
