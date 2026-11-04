@@ -27,6 +27,7 @@ type QuestionVersion = {
 };
 type Question = { id: string; current_version_number: number; versions: QuestionVersion[] };
 type GenerationResult = { created_count: number; total_marks: number; questions: Question[] };
+type Exam = { id: string; title: string; duration_minutes: number; total_marks: number; question_count: number };
 
 const panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
 const field = { width: "100%", padding: "10px 12px", marginTop: 6, borderRadius: 8, border: "1px solid #364154", background: "#0b1018", color: "#f4f6fa" } as const;
@@ -45,6 +46,10 @@ export default function QuestionBankPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [selectedQuestionVersions, setSelectedQuestionVersions] = useState<string[]>([]);
+  const [examTitle, setExamTitle] = useState("My subject practice examination");
+  const [examDuration, setExamDuration] = useState(45);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [questionCount, setQuestionCount] = useState(10);
   const [totalMarks, setTotalMarks] = useState(30);
   const [difficulty, setDifficulty] = useState("medium");
@@ -95,12 +100,14 @@ export default function QuestionBankPage() {
     if (!id) return;
     setBusy(true); setError("");
     try {
-      const [sourceList, bank] = await Promise.all([
+      const [sourceList, bank, practiceExams] = await Promise.all([
         api<Resource[]>(`/workspaces/${workspaceId}/subjects/${id}/resources`),
         api<Question[]>(`/workspaces/${workspaceId}/subjects/${id}/questions`),
+        api<Exam[]>(`/workspaces/${workspaceId}/subjects/${id}/practice-exams`),
       ]);
-      setResources(sourceList); setQuestions(bank);
-      setNotice(`Loaded ${sourceList.length} resources and ${bank.length} questions.`);
+      setResources(sourceList); setQuestions(bank); setExams(practiceExams);
+      setSelectedQuestionVersions([]);
+      setNotice(`Loaded ${sourceList.length} resources, ${bank.length} questions and ${practiceExams.length} practice exams.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load this subject."); }
     finally { setBusy(false); }
   }
@@ -113,7 +120,38 @@ export default function QuestionBankPage() {
     setSelectedTypes((current) => current.includes(type) ? current.filter((item) => item !== type) : [...current, type]);
   }
 
-  async function generate(event: FormEvent<HTMLFormElement>) {
+
+  function toggleQuestionVersion(id: string) {
+    setSelectedQuestionVersions((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }
+
+  async function createPracticeExam(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedQuestionVersions.length || !examTitle.trim()) {
+      setError("Select at least one question and provide a practice examination title.");
+      return;
+    }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const exam = await api<Exam>(
+        `/workspaces/${workspaceId}/subjects/${subjectId}/practice-exams`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: examTitle.trim(),
+            duration_minutes: examDuration,
+            question_version_ids: selectedQuestionVersions,
+          }),
+        },
+      );
+      setExams((current) => [exam, ...current]);
+      setSelectedQuestionVersions([]);
+      setNotice(`Practice examination created: ${exam.question_count} questions, ${exam.total_marks} marks, ${exam.duration_minutes} minutes.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create the practice exam."); }
+    finally { setBusy(false); }
+  }
+\n  async function generate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedSources.length || !selectedTypes.length) {
       setError("Select at least one fully extracted source version and one question type.");
@@ -205,6 +243,10 @@ export default function QuestionBankPage() {
             {questions.length === 0 && <p style={{ color: "#9aa5b5", fontSize: 13 }}>Your generated questions will appear here with citations to their source material.</p>}
             {questions.map((question) => question.versions.map((version) => (
               <article key={version.id} style={{ borderTop: "1px solid #293242", padding: "14px 0" }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", color: "#55d5e8", fontSize: 12 }}>
+                  <input type="checkbox" checked={selectedQuestionVersions.includes(version.id)} onChange={() => toggleQuestionVersion(version.id)} />
+                  Include in a practice examination
+                </label>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                   <strong style={{ fontSize: 13 }}>{version.question_type.replaceAll("_", " ")}</strong>
                   <small style={{ color: "#55d5e8" }}>{version.marks} marks · {version.difficulty} · {version.cognitive_level} · {version.review_status}</small>
@@ -214,6 +256,21 @@ export default function QuestionBankPage() {
                 <small style={{ color: "#9aa5b5" }}>Sources: {version.source_citations.map((citation) => `${citation.document_title} · ${citation.locator}`).join("; ")}</small>
               </article>
             )))}
+            <div style={{ borderTop: "1px solid #293242", marginTop: 18, paddingTop: 14 }}>
+              <h3 style={{ fontSize: 16 }}>5. Assemble a timed practice exam</h3>
+              <form onSubmit={createPracticeExam}>
+                <label style={{ display: "block", fontSize: 13 }}>Exam title<input value={examTitle} onChange={(event) => setExamTitle(event.target.value)} required maxLength={240} style={field} /></label>
+                <label style={{ display: "block", fontSize: 13, marginTop: 10 }}>Duration (minutes)<input type="number" min={5} max={360} value={examDuration} onChange={(event) => setExamDuration(Number(event.target.value))} style={field} /></label>
+                <p style={{ color: "#9aa5b5", fontSize: 12 }}>{selectedQuestionVersions.length} question version(s) selected. The exam freezes their current wording, marks and order.</p>
+                <button type="submit" disabled={busy || !selectedQuestionVersions.length} style={{ ...action, width: "100%" }}>Create practice examination</button>
+              </form>
+              <h3 style={{ fontSize: 16, marginTop: 22 }}>My practice examinations ({exams.length})</h3>
+              {exams.map((exam) => <div key={exam.id} style={{ padding: 12, marginTop: 8, border: "1px solid #364154", borderRadius: 8 }}>
+                <strong>{exam.title}</strong>
+                <small style={{ display: "block", color: "#9aa5b5", marginTop: 4 }}>{exam.question_count} questions · {exam.total_marks} marks · {exam.duration_minutes} minutes</small>
+                <Link href="/coursework/practice" style={{ display: "inline-block", color: "#55d5e8", marginTop: 8, fontSize: 12 }}>Open practice exams →</Link>
+              </div>)}
+            </div>
           </section>
         </div>
       )}
