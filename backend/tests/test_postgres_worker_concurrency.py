@@ -318,3 +318,136 @@ def test_postgres_tenant_isolation_and_role_authorization(
     finally:
         app.dependency_overrides.pop(get_db, None)
         settings.document_storage_path = previous_storage_path
+
+
+def test_postgres_academic_routes_enforce_role_and_tenant_boundaries(
+    postgres_sessions, tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise route dependencies against PostgreSQL, not only the SQLite API fixture."""
+    settings = get_settings()
+    previous_storage_path = settings.document_storage_path
+    settings.document_storage_path = str(tmp_path / "postgres-route-matrix")
+    app.state.test_engine = postgres_sessions.kw["bind"]
+
+    def override_get_db():
+        with postgres_sessions() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    def register_workspace(client: TestClient, email: str) -> tuple[str, str]:
+        password = "Correct-Horse-Battery-9!"
+        registered = client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "display_name": "PostgreSQL matrix", "password": password},
+        )
+        assert registered.status_code == 201
+        login = client.post(
+            "/api/v1/auth/login", json={"email": email, "password": password}
+        )
+        assert login.status_code == 200
+        token = login.json()["access_token"]
+        workspace = client.post(
+            "/api/v1/workspaces",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"name": "PostgreSQL matrix", "slug": f"pg-{uuid4().hex[:12]}"},
+        )
+        assert workspace.status_code == 201
+        return token, workspace.json()["id"]
+
+    try:
+        with TestClient(app) as client:
+            owner_token, owner_workspace = register_workspace(
+                client, "postgres-route-owner@example.test"
+            )
+            outsider_token, outsider_workspace = register_workspace(
+                client, "postgres-route-outsider@example.test"
+            )
+            source = client.post(
+                f"/api/v1/workspaces/{owner_workspace}/documents",
+                headers={"Authorization": f"Bearer {owner_token}"},
+                data={"title": "PostgreSQL authorization source"},
+                files={"file": ("source.txt", b"PostgreSQL source text", "text/plain")},
+            )
+            assert source.status_code == 201
+            document_id = source.json()["id"]
+            version_id = source.json()["versions"][0]["id"]
+            subject = client.post(
+                f"/api/v1/workspaces/{owner_workspace}/taxonomy/subjects",
+                headers={"Authorization": f"Bearer {owner_token}"},
+                json={"name": "PostgreSQL subject"},
+            )
+            assert subject.status_code == 201
+            topic = client.post(
+                f"/api/v1/workspaces/{owner_workspace}/taxonomy/subjects/{subject.json()['id']}/topics",
+                headers={"Authorization": f"Bearer {owner_token}"},
+                json={"name": "PostgreSQL topic"},
+            )
+            assert topic.status_code == 201
+
+            foreign_headers = {"Authorization": f"Bearer {outsider_token}"}
+            cross_tenant_requests = [
+                client.get(
+                    f"/api/v1/workspaces/{outsider_workspace}/documents/{document_id}",
+                    headers=foreign_headers,
+                ),
+                client.get(
+                    f"/api/v1/workspaces/{outsider_workspace}/documents/{document_id}/versions/{version_id}/segments",
+                    headers=foreign_headers,
+                ),
+                client.get(
+                    f"/api/v1/workspaces/{outsider_workspace}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+                    headers=foreign_headers,
+                ),
+                client.put(
+                    f"/api/v1/workspaces/{outsider_workspace}/documents/{document_id}/versions/{version_id}/classifications",
+                    headers=foreign_headers,
+                    json={"topic_ids": [topic.json()["id"]], "rationale": "Cross-tenant test"},
+                ),
+            ]
+            assert [response.status_code for response in cross_tenant_requests] == [
+                404,
+                404,
+                404,
+                404,
+            ]
+
+            with postgres_sessions() as db:
+                membership = db.scalar(
+                    select(WorkspaceMembership).where(
+                        WorkspaceMembership.workspace_id == UUID(owner_workspace)
+                    )
+                )
+                assert membership is not None
+                membership.role = MembershipRole.STUDENT
+                db.commit()
+
+            student_headers = {"Authorization": f"Bearer {owner_token}"}
+            student_requests = [
+                client.get(
+                    f"/api/v1/workspaces/{owner_workspace}/documents",
+                    headers=student_headers,
+                ),
+                client.get(
+                    f"/api/v1/workspaces/{owner_workspace}/documents/{document_id}",
+                    headers=student_headers,
+                ),
+                client.get(
+                    f"/api/v1/workspaces/{owner_workspace}/taxonomy/subjects",
+                    headers=student_headers,
+                ),
+                client.post(
+                    f"/api/v1/workspaces/{owner_workspace}/taxonomy/subjects",
+                    headers=student_headers,
+                    json={"name": "Forbidden PostgreSQL subject"},
+                ),
+            ]
+            assert [response.status_code for response in student_requests] == [
+                403,
+                403,
+                403,
+                403,
+            ]
+    finally:
+        app.dependency_overrides.clear()
+        settings.document_storage_path = previous_storage_path
