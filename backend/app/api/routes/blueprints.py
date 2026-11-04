@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.dependencies import require_workspace_roles
 from app.core.database import get_db
 from app.models import (
-    AcademicDocument,
     BlueprintTopicWeight,
     BlueprintVersionStatus,
     ExamBlueprint,
