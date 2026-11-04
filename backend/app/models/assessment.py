@@ -110,6 +110,11 @@ class ExamBlueprintVersion(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     blueprint: Mapped[ExamBlueprint] = relationship(back_populates="versions")
+    outcome_weights: Mapped[list["BlueprintOutcomeWeight"]] = relationship(
+        back_populates="version",
+        cascade="all, delete-orphan",
+        order_by="BlueprintOutcomeWeight.learning_outcome_id",
+    )
     topic_weights: Mapped[list["BlueprintTopicWeight"]] = relationship(
         back_populates="version",
         cascade="all, delete-orphan",
@@ -136,3 +141,24 @@ class BlueprintTopicWeight(Base):
     )
     target_marks: Mapped[int] = mapped_column(Integer, nullable=False)
     version: Mapped[ExamBlueprintVersion] = relationship(back_populates="topic_weights")
+
+
+class BlueprintOutcomeWeight(Base):
+    """Exact learning-outcome mark allocation within a blueprint version."""
+
+    __tablename__ = "blueprint_outcome_weights"
+    __table_args__ = (
+        UniqueConstraint("version_id", "learning_outcome_id", name="uq_blueprint_version_outcome_weight"),
+        Index("ix_blueprint_outcome_weights_outcome", "learning_outcome_id"),
+        CheckConstraint("target_marks > 0", name="ck_blueprint_outcome_target_marks_positive"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("exam_blueprint_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    learning_outcome_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("learning_outcomes.id", ondelete="RESTRICT"), nullable=False
+    )
+    target_marks: Mapped[int] = mapped_column(Integer, nullable=False)
+    version: Mapped[ExamBlueprintVersion] = relationship(back_populates="outcome_weights")
