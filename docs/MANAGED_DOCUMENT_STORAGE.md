@@ -21,6 +21,16 @@
 7. Deploy API and worker with the S3 backend and run ingestion plus extraction smoke tests. Keep local copies and backups during the observation window.
 8. Only after a verified backup, successful worker reads and an approved rollback window may operators retire the old local volume. The migration utility's optional `--delete-local` flag is deliberately explicit and should not be used during initial cutover.
 
+## Provider smoke test
+
+After provisioning the private bucket and configuring the API/worker environment, run the real provider check from the backend environment:
+
+\`\`\`bash
+python backend/scripts/verify_object_storage.py
+\`\`\`
+
+The check uploads a short-lived random-key object through the production adapter, downloads it, verifies byte-for-byte content plus expected size and SHA-256, and deletes it in a `finally` block. Run it against the intended staging bucket before migration. It does not create or alter PostgreSQL document records.
+
 ## Rollback
 
 Set `DOCUMENT_STORAGE_BACKEND=local` for both API and worker and restore the original private volume. Since the migration preserves all database storage keys and retains local files by default, rollback does not require a database migration or document-version rewrite.
