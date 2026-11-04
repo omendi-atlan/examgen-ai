@@ -224,6 +224,9 @@ class Topic(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     subject: Mapped[Subject] = relationship(back_populates="topics")
+    learning_outcomes: Mapped[list["LearningOutcome"]] = relationship(
+        back_populates="topic", cascade="all, delete-orphan"
+    )
     classifications: Mapped[list["DocumentTopicClassification"]] = relationship(
         back_populates="topic", cascade="all, delete-orphan"
     )
@@ -321,3 +324,30 @@ class DocumentExtractionReview(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class LearningOutcome(Base):
+    """Explicit assessable outcome nested under a workspace-owned topic."""
+
+    __tablename__ = "learning_outcomes"
+    __table_args__ = (
+        UniqueConstraint("topic_id", "code", name="uq_learning_outcome_topic_code"),
+        Index("ix_learning_outcomes_workspace_topic", "workspace_id", "topic_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    topic_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    topic: Mapped[Topic] = relationship(back_populates="learning_outcomes")
