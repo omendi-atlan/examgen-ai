@@ -32,7 +32,7 @@ type Exam = { id: string; title: string; duration_minutes: number; total_marks: 
 const panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
 const field = { width: "100%", padding: "10px 12px", marginTop: 6, borderRadius: 8, border: "1px solid #364154", background: "#0b1018", color: "#f4f6fa" } as const;
 const action = { border: 0, borderRadius: 8, padding: "11px 15px", background: "#ff8a35", color: "#20140b", fontWeight: 800, cursor: "pointer" } as const;
-const questionTypes = ["multiple_choice", "multiple_select", "true_false", "fill_blank", "short_answer", "long_answer", "numeric", "matching", "ordering", "programming", "diagram_interpretation", "diagram_construction"];
+const questionTypes = ["multiple_choice", "multiple_select", "true_false", "fill_blank", "short_answer", "long_answer", "numeric", "matching", "ordering", "programming"];
 
 export default function QuestionBankPage() {
   const [apiBase, setApiBase] = useState(process.env.NEXT_PUBLIC_EXAMGEN_API_URL ?? "http://localhost:8000");
