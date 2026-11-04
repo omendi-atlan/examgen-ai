@@ -374,6 +374,17 @@ def test_staff_approved_cohort_question_is_visible_without_key(client: TestClien
     assert "answer_key" not in visible.json()["versions"][0]
     assert "model_answer" not in visible.json()["versions"][0]
 
+    with Session(app.state.test_engine) as db:
+        subject = db.get(Subject, UUID(context["subject_id"]))
+        assert subject is not None
+        subject.resource_sharing_enabled = False
+        db.commit()
+    hidden_after_sharing_disabled = client.get(
+        f"/api/v1/workspaces/{context['workspace_id']}/questions/{question['id']}",
+        headers=student_headers,
+    )
+    assert hidden_after_sharing_disabled.status_code == 404
+
 
 def test_cohort_question_cannot_cite_private_student_resource(client: TestClient) -> None:
     context = create_context(client, "cohort-private-source")
