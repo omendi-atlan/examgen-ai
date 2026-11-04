@@ -22,6 +22,19 @@ from app.models.assessment import (
     ExamBlueprint,
     ExamBlueprintVersion,
 )
+from app.models.exam_delivery import (
+    AttemptMark,
+    AttemptMarkingMethod,
+    AttemptResponse,
+    AttemptSubmission,
+    ExamAttempt,
+    ExamAttemptStatus,
+    ExamPaper,
+    ExamPaperMode,
+    ExamPaperQuestion,
+    ExamPaperStatus,
+    ExamPaperVersion,
+)
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
@@ -39,7 +52,7 @@ from app.models.question_bank import (
 )
 
 __all__ = [
-    "AcademicDocument",
+    "AcademicDocument",\n    "AttemptMark",\n    "AttemptMarkingMethod",\n    "AttemptResponse",\n    "AttemptSubmission",\n    "ExamAttempt",\n    "ExamAttemptStatus",\n    "ExamPaper",\n    "ExamPaperMode",\n    "ExamPaperQuestion",\n    "ExamPaperStatus",\n    "ExamPaperVersion",
     "Question",
     "QuestionSourceCitation",
     "QuestionVersion",
