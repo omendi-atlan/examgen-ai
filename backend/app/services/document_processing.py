@@ -19,7 +19,7 @@ from app.models import (
     ExtractionStatus,
 )
 from app.services.document_extraction import extract_document
-from app.services.document_storage import resolve_storage_path
+from app.services.object_storage import open_storage_file
 
 logger = logging.getLogger(__name__)
 MIN_REVIEW_CHARACTERS_PER_PAGE = 40
