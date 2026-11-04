@@ -1,13 +1,16 @@
 """End-to-end tests for identity, workspace isolation and audit persistence."""
 
 import pytest
+from app.api.dependencies import enforce_auth_rate_limit
 from app.core.database import Base, get_db
 from app.main import app
 from app.models import AuditEvent, MembershipRole, WorkspaceMembership
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
+from starlette.requests import Request
 
 
 @pytest.fixture
@@ -182,3 +185,49 @@ def test_registration_rate_limit_is_enforced(client: TestClient) -> None:
     )
     assert limited.status_code == 429
     assert int(limited.headers["Retry-After"]) > 0
+
+
+def test_authenticated_upload_quota_is_shared_across_client_addresses(
+    client: TestClient,
+) -> None:
+    user = register(client, "global-upload-quota@example.test")
+    user_id = user["id"]
+
+    def request_from(address: str) -> Request:
+        return Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/v1/workspaces/test/documents",
+                "headers": [],
+                "client": (address, 12345),
+                "server": ("testserver", 80),
+                "scheme": "http",
+            }
+        )
+
+    with Session(app.state.test_engine) as db:
+        enforce_auth_rate_limit(
+            request_from("198.51.100.10"),
+            db,
+            scope="global-upload-account-test",
+            subject=user_id,
+            limit=1,
+            window_seconds=3600,
+            include_client=False,
+        )
+
+    with Session(app.state.test_engine) as db:
+        with pytest.raises(HTTPException) as limited:
+            enforce_auth_rate_limit(
+                request_from("203.0.113.22"),
+                db,
+                scope="global-upload-account-test",
+                subject=user_id,
+                limit=1,
+                window_seconds=3600,
+                include_client=False,
+            )
+
+    assert limited.value.status_code == 429
+    assert int(limited.value.headers["Retry-After"]) > 0
