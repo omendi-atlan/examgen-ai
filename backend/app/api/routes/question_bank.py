@@ -324,14 +324,15 @@ async def generate_subject_questions(
         db.rollback()
         raise
 
-    saved = list(
+    saved_rows = list(
         db.scalars(
             select(Question)
             .where(Question.id.in_([item.id for item in created]))
             .options(selectinload(Question.versions))
-            .order_by(Question.created_at, Question.id)
         ).all()
     )
+    saved_by_id = {item.id: item for item in saved_rows}
+    saved = [saved_by_id[item.id] for item in created]
     return QuestionGenerationResponse(
         created_count=len(saved),
         total_marks=sum(item.marks for item in questions),
