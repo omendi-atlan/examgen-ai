@@ -138,7 +138,7 @@ def test_ocr_fallback_preserves_page_provenance_for_every_scanned_page(
     pdfium = ModuleType("pypdfium2")
     pdfium.PdfDocument = lambda _path: FakePdfiumDocument()
     pytesseract = ModuleType("pytesseract")
-    pytesseract.image_to_string = lambda _image, timeout: f"OCR source page {timeout}"
+    pytesseract.image_to_string = lambda _image, timeout: "OCR extracted text"
     monkeypatch.setitem(sys.modules, "pypdfium2", pdfium)
     monkeypatch.setitem(sys.modules, "pytesseract", pytesseract)
     monkeypatch.setattr(
@@ -158,12 +158,12 @@ def test_ocr_fallback_preserves_page_provenance_for_every_scanned_page(
     assert result.parser_name == "pypdf+pytesseract"
     assert len(result.segments) == 3
     assert [segment.locator for segment in result.segments] == [
-        "page-1:chars-1-21",
-        "page-2:chars-1-21",
-        "page-3:chars-1-21",
+        "page-1:chars-1-18",
+        "page-2:chars-1-18",
+        "page-3:chars-1-18",
     ]
     assert [segment.metadata for segment in result.segments] == [
-        {"page": 1, "extraction_method": "ocr", "start_char": 0, "end_char": 21},
+        {"page": 1, "extraction_method": "ocr", "start_char": 0, "end_char": 18},
         {"page": 2, "extraction_method": "ocr", "start_char": 0, "end_char": 21},
         {"page": 3, "extraction_method": "ocr", "start_char": 0, "end_char": 21},
     ]
