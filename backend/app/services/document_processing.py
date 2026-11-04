@@ -2,6 +2,7 @@
 
 import logging
 import time
+from threading import Event, Thread
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -114,6 +115,38 @@ def claim_next_job(db: Session) -> UUID | None:
     job.lease_token = uuid4()
     db.commit()
     return job.id
+
+
+
+def heartbeat_job(job_id: UUID, lease_token: UUID) -> bool:
+    """Extend a live worker lease only while its fencing token remains current."""
+    with SessionLocal() as db:
+        job = db.scalar(
+            select(DocumentProcessingJob)
+            .where(DocumentProcessingJob.id == job_id)
+            .with_for_update()
+        )
+        if (
+            job is None
+            or job.status != ExtractionJobStatus.PROCESSING
+            or job.lease_token != lease_token
+        ):
+            return False
+        job.lease_expires_at = time.time() + get_settings().document_job_lease_seconds
+        db.commit()
+        return True
+
+
+def _lease_heartbeat(job_id: UUID, lease_token: UUID, stop: Event) -> None:
+    """Renew a job lease during long but resource-bounded parsing and OCR."""
+    lease_seconds = get_settings().document_job_lease_seconds
+    interval = max(5.0, min(60.0, lease_seconds / 3))
+    while not stop.wait(interval):
+        try:
+            if not heartbeat_job(job_id, lease_token):
+                return
+        except Exception:
+            logger.exception("Could not renew document processing lease %s", job_id)
 
 
 def _record_failure(db: Session, job_id: UUID, lease_token: UUID, exc: Exception) -> bool:
@@ -249,14 +282,31 @@ def process_job(db: Session, job_id: UUID) -> bool:
 
 
 def run_once() -> bool:
-    """Claim and process one queued job; suitable for a dedicated worker process."""
+    """Claim one job and renew its lease while processing in a separate session."""
     with SessionLocal() as db:
         job_id = claim_next_job(db)
         if job_id is None:
             return False
-        process_job(db, job_id)
-        return True
+        job = db.get(DocumentProcessingJob, job_id)
+        lease_token = job.lease_token if job is not None else None
+    if lease_token is None:
+        return False
 
+    stop = Event()
+    heartbeat = Thread(
+        target=_lease_heartbeat,
+        args=(job_id, lease_token, stop),
+        name=f"document-lease-{job_id}",
+        daemon=True,
+    )
+    heartbeat.start()
+    try:
+        with SessionLocal() as db:
+            process_job(db, job_id)
+    finally:
+        stop.set()
+        heartbeat.join(timeout=5)
+    return True
 
 def run_worker(poll_seconds: float = 2.0) -> None:
     """Continuously consume the durable queue and recover from transient DB outages."""
