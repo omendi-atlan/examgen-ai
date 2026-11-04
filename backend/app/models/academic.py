@@ -28,6 +28,15 @@ class ExtractionStatus(StrEnum):
     NEEDS_OCR = "needs_ocr"
     EMPTY = "empty"
     FAILED = "failed"
+    QUEUED = "queued"
+    PROCESSING = "processing"
+
+
+class ExtractionJobStatus(StrEnum):
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class ClassificationMethod(StrEnum):
@@ -128,6 +137,7 @@ class DocumentExtraction(Base):
     character_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     extraction_metadata: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
     error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    quality_report: Mapped[dict[str, object]] = mapped_column(JSON, default=dict, nullable=False)
     extracted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -247,3 +257,36 @@ class DocumentTopicClassification(Base):
     )
     version: Mapped[DocumentVersion] = relationship(back_populates="classifications")
     topic: Mapped[Topic] = relationship(back_populates="classifications")
+
+
+class DocumentProcessingJob(Base):
+    """Durable processing work item bound to exactly one immutable source version."""
+
+    __tablename__ = "document_processing_jobs"
+    __table_args__ = (
+        Index("ix_document_processing_jobs_status_created", "status", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("document_versions.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    status: Mapped[ExtractionJobStatus] = mapped_column(
+        SqlEnum(
+            ExtractionJobStatus,
+            native_enum=False,
+            length=24,
+            values_callable=lambda values: [item.value for item in values],
+        ),
+        default=ExtractionJobStatus.QUEUED,
+        nullable=False,
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    started_at: Mapped[float | None] = mapped_column(nullable=True)
+    finished_at: Mapped[float | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    version: Mapped[DocumentVersion] = relationship()
