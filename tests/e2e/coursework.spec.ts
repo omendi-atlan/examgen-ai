@@ -183,3 +183,137 @@ test("camera scanner captures a page and prepares a PDF for subject upload", asy
   await expect(page.getByText(/Selected: coursework-scan-.*\.pdf/)).toBeVisible();
   await expect(page.getByRole("dialog", { name: "Document scanner" })).toHaveCount(0);
 });
+
+
+test("student generates a private source-cited question bank from an approved blueprint", async ({ page }) => {
+  const calls: { method: string; path: string }[] = [];
+  await page.route("**/api/v1/**", async (route: Route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    const method = request.method();
+    calls.push({ method, path });
+
+    if (path.endsWith("/auth/login") && method === "POST") {
+      await route.fulfill({ json: { access_token: "e2e-student-token", token_type: "bearer" } });
+      return;
+    }
+    if (path.endsWith("/workspaces") && method === "GET") {
+      await route.fulfill({ json: [{ id: workspaceId, name: "Student Workspace", slug: "student-workspace" }] });
+      return;
+    }
+    if (path.endsWith("/subjects") && method === "GET") {
+      await route.fulfill({
+        json: [{ id: subjectId, workspace_id: workspaceId, name: "INL201", description: "Information Systems", resource_sharing_enabled: false }],
+      });
+      return;
+    }
+    if (path.endsWith("/resources") && method === "GET") {
+      await route.fulfill({
+        json: [{
+          id: resourceId,
+          title: "INL201 lecture notes",
+          subject_id: subjectId,
+          visibility: "private",
+          current_version_number: 1,
+          versions: [{
+            id: versionId,
+            version_number: 1,
+            original_filename: "lecture-notes.txt",
+            extraction: { status: "extracted", character_count: 38, segment_count: 1, error_message: null },
+          }],
+        }],
+      });
+      return;
+    }
+    if (path.endsWith("/approved-blueprints") && method === "GET") {
+      await route.fulfill({
+        json: [{
+          blueprint_id: "blueprint-1",
+          blueprint_version_id: "blueprint-version-1",
+          subject_id: subjectId,
+          title: "INL201 Practice Blueprint",
+          duration_minutes: 30,
+          total_marks: 2,
+          question_count: 1,
+          cognitive_distribution: { remember: 100 },
+          difficulty_distribution: { easy: 100 },
+          question_type_distribution: { multiple_choice: 100 },
+          approved_at: "2026-11-04T12:00:00Z",
+        }],
+      });
+      return;
+    }
+    if (path.endsWith("/questions") && method === "GET") {
+      await route.fulfill({ json: [] });
+      return;
+    }
+    if (path.endsWith("/generate-questions") && method === "POST") {
+      await route.fulfill({
+        status: 201,
+        json: {
+          blueprint_version_id: "blueprint-version-1",
+          generated_count: 1,
+          total_marks: 2,
+          questions: [{
+            id: "generated-question-1",
+            workspace_id: workspaceId,
+            subject_id: subjectId,
+            created_by: "student-1",
+            visibility: "private",
+            current_version_number: 1,
+            created_at: "2026-11-04T12:00:00Z",
+            updated_at: "2026-11-04T12:00:00Z",
+            versions: [{
+              id: "generated-question-version-1",
+              version_number: 1,
+              topic_id: "topic-1",
+              learning_outcome_id: "outcome-1",
+              question_type: "multiple_choice",
+              prompt: "Which key uniquely identifies each row in a relational table?",
+              marks: 2,
+              cognitive_level: "remember",
+              difficulty: "easy",
+              response_schema: {
+                options: [
+                  { id: "A", label: "Primary key" },
+                  { id: "B", label: "Foreign key" },
+                ],
+              },
+              status: "draft",
+              citations: [{
+                id: "citation-1",
+                source_segment_id: "segment-1",
+                source_version_id: versionId,
+                source_locator: "page:1",
+                excerpt: "A primary key uniquely identifies each row.",
+              }],
+            }],
+          }],
+        },
+      });
+      return;
+    }
+    await route.fulfill({ status: 404, json: { detail: `Unmocked E2E endpoint: ${method} ${path}` } });
+  });
+
+  await page.goto("/question-bank");
+  await page.getByLabel("Email").fill("student@example.test");
+  await page.getByLabel("Password").fill("not-a-real-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Signed in. Choose a subject to build your practice question bank.")).toBeVisible();
+  await page.getByLabel("Workspace").selectOption(workspaceId);
+  await page.getByLabel("Subject / module").selectOption(subjectId);
+
+  await page.getByLabel("Approved examination blueprint").selectOption("blueprint-version-1");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Generate practice questions" }).click();
+
+  await expect(page.getByRole("status")).toContainText("Generated 1 private draft question(s), totalling 2 marks");
+  await expect(page.getByRole("heading", { name: "My question bank (1)" })).toBeVisible();
+  await expect(page.getByText("Which key uniquely identifies each row in a relational table?")).toBeVisible();
+  await expect(page.getByText("A. Primary key", { exact: true })).toBeVisible();
+  await expect(page.getByText("page:1")).toBeVisible();
+  await expect(page.getByText(/answer_key|correct_option_id|model_answer/)).toHaveCount(0);
+  expect(calls.some((call) => call.method === "POST" && call.path.endsWith("/generate-questions"))).toBeTruthy();
+});

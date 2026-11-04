@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     ocr_page_timeout_seconds: int = 15
     max_extracted_characters: int = 10000000
     max_office_archive_ratio: int = 100
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-4o-mini"
+    openai_timeout_seconds: int = 45
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
@@ -81,6 +84,8 @@ class Settings(BaseSettings):
             raise ValueError("MAX_EXTRACTED_CHARACTERS must be between 1,000 and 50 million.")
         if not 1 <= self.max_office_archive_ratio <= 1000:
             raise ValueError("MAX_OFFICE_ARCHIVE_RATIO must be between 1 and 1,000.")
+        if not 10 <= self.openai_timeout_seconds <= 120:
+            raise ValueError("OPENAI_TIMEOUT_SECONDS must be between 10 and 120.")
         return self
 
 
