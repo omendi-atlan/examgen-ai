@@ -27,7 +27,6 @@ from app.services.question_generation import (
     QuestionGenerationService,
     validate_generated_set,
 )
-
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import create_engine, select
