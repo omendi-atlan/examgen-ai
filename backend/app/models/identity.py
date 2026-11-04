@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import (
     DateTime,
@@ -21,7 +21,7 @@ from app.core.database import Base
 from app.models.base import TimestampMixin
 
 
-class MembershipRole(str, Enum):
+class MembershipRole(StrEnum):
     OWNER = "owner"
     ADMIN = "admin"
     EXAMINER = "examiner"
@@ -29,7 +29,7 @@ class MembershipRole(str, Enum):
     STUDENT = "student"
 
 
-class MembershipStatus(str, Enum):
+class MembershipStatus(StrEnum):
     ACTIVE = "active"
     INVITED = "invited"
     SUSPENDED = "suspended"
