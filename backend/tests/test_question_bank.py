@@ -3,10 +3,15 @@
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
-import pytest
 import httpx
+import pytest
+from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
+from app.api.routes.question_bank import get_question_generation_service
 from app.core.config import Settings
 from app.core.database import Base, get_db
 from app.main import app
@@ -22,13 +27,12 @@ from app.models import (
     User,
     WorkspaceMembership,
 )
-from app.api.routes.question_bank import get_question_generation_service
 from app.schemas.question_bank import QuestionContentInput
-from app.services.question_generation import (\n    QuestionGenerationError,\n    QuestionGenerationService,\n    validate_generated_set,\n)
-from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
+from app.services.question_generation import (
+    QuestionGenerationError,
+    QuestionGenerationService,
+    validate_generated_set,
+)
 
 
 @pytest.fixture
@@ -51,8 +55,6 @@ def client():
 
 
 def create_engine_for_tests():
-    from sqlalchemy import create_engine
-
     return create_engine(
         "sqlite+pysqlite://",
         connect_args={"check_same_thread": False},
