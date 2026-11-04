@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
 
-from app.services.malware_scanning import MalwareDetectedError, scan_file
+from app.services.malware_scanning import MalwareDetectedError, scan_file\nfrom app.services.object_storage import persist_file
 
 SUPPORTED_TYPES = {
     ".pdf": "application/pdf",
