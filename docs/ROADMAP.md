@@ -67,6 +67,7 @@ The repository has a Next.js coursework/authoring workspace, transitional TypeSc
 - [x] Validate question types, objective options, type-specific answer structures, difficulty, cognitive level, question count and exact mark totals.
 - [x] Add per-student subject-bank duplicate prevention and AI generation rate limits.
 - [x] Keep answer keys and explanations out of student question-bank list responses.
+- [x] Limit generated question types to controls currently supported by the practice runner; visual/diagram question types remain gated until Phase 4 provides approved visual assets and rendering.
 - [ ] Add question moderation, approved question publication and rubric governance for formal examinations.
 - [ ] Add diagram requirement analysis and visual generation/approval gates.
 - [ ] Add robust multi-provider staging qualification and representative generation quality evaluation.
@@ -76,7 +77,7 @@ The repository has a Next.js coursework/authoring workspace, transitional TypeSc
 - Required visuals block publication until approval.
 
 ### Phase 5 — HTML/CSS/JavaScript examination delivery (practice MVP implemented)
-- [x] Deliver the timed student practice runner as a standalone semantic HTML/CSS/vanilla JavaScript package, separate from the Next.js authoring shell.
+- [x] Deliver the timed student practice runner as a standalone semantic HTML/CSS/vanilla JavaScript package, separate from the Next.js authoring shell; CI runs a JavaScript syntax check.
 - [x] Add type-matched controls for multiple choice, multiple select, true/false, numeric, fill-in and written responses.
 - [x] Add durable attempt retrieval/resume, debounced autosave and server-authoritative expiry.
 - [ ] Complete browser-level accessibility and real-device qualification.
