@@ -74,7 +74,14 @@ async function buildScannedPdf(pages: ScannedPage[]): Promise<Blob> {
     `${xref}trailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`,
   );
   chunks.push(trailer);
-  return new Blob(chunks, { type: "application/pdf" });
+  const totalLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const pdfBytes = new Uint8Array(totalLength);
+  let cursor = 0;
+  for (const chunk of chunks) {
+    pdfBytes.set(chunk, cursor);
+    cursor += chunk.length;
+  }
+  return new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
 }
 
 const panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
