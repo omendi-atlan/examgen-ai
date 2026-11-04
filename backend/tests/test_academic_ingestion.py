@@ -531,3 +531,34 @@ def test_all_academic_routes_hide_resources_from_other_workspaces(client: TestCl
         assert response.status_code == expected_status, (
             f"{method.upper()} {path}: {response.status_code} {response.text}"
         )
+
+
+def test_academic_upload_rate_limit_is_shared_and_returns_retry_after(
+    client: TestClient,
+) -> None:
+    token, workspace_id = create_workspace(client, "upload-rate-limit@example.test")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for index in range(20):
+        response = client.post(
+            f"/api/v1/workspaces/{workspace_id}/documents",
+            headers=headers,
+            data={"title": f"Rate-limited source {index}"},
+            files={
+                "file": (
+                    f"source-{index}.txt",
+                    f"Unique academic source content {index}".encode(),
+                    "text/plain",
+                )
+            },
+        )
+        assert response.status_code == 201
+
+    limited = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers=headers,
+        data={"title": "Upload beyond hourly limit"},
+        files={"file": ("source-over-limit.txt", b"Unique source beyond limit", "text/plain")},
+    )
+    assert limited.status_code == 429
+    assert int(limited.headers["Retry-After"]) > 0
