@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 COGNITIVE_LEVELS = {"remember", "understand", "apply", "analyze", "evaluate", "create"}
 DIFFICULTY_LEVELS = {"easy", "medium", "hard"}
@@ -39,6 +39,14 @@ class BlueprintVersionCreate(BaseModel):
     difficulty_distribution: dict[str, int]
     question_type_distribution: dict[str, int]
     topic_weights: list[BlueprintTopicWeightInput] = Field(min_length=1, max_length=100)
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Blueprint title cannot be blank.")
+        return clean
 
     @model_validator(mode="after")
     def validate_blueprint_constraints(self):
