@@ -125,12 +125,29 @@ export default function DocumentReviewPage() {
     }
     let active = true;
     setBusy(true);
-    request<Segment[]>(`/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/segments`)
-      .then((result) => { if (active) setSegments(result); })
-      .catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "Could not load extracted text."); })
-      .finally(() => { if (active) setBusy(false); });
+    async function loadSegments() {
+      try {
+        const response = await fetch(
+          `${base}/api/v1/workspaces/${workspaceId}/documents/${documentId}/versions/${versionId}/segments`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        const data: unknown = await response.json();
+        if (!response.ok) {
+          const detail = typeof data === "object" && data !== null && "detail" in data
+            ? String((data as { detail: unknown }).detail)
+            : "Could not load extracted text.";
+          throw new Error(detail);
+        }
+        if (active) setSegments(data as Segment[]);
+      } catch (cause) {
+        if (active) setError(cause instanceof Error ? cause.message : "Could not load extracted text.");
+      } finally {
+        if (active) setBusy(false);
+      }
+    }
+    void loadSegments();
     return () => { active = false; };
-  }, [token, workspaceId, documentId, versionId]);
+  }, [token, workspaceId, documentId, versionId, base]);
 
   const statusLabel = useMemo(() => selectedVersion?.extraction?.status.replaceAll("_", " ") ?? "not processed", [selectedVersion]);
   const panelStyle = { background: "#11151e", border: "1px solid #262e3b", borderRadius: 15, padding: 20 } as const;
