@@ -28,6 +28,11 @@ class BlueprintTopicWeightInput(BaseModel):
     target_marks: int = Field(gt=0, le=1000)
 
 
+class BlueprintOutcomeWeightInput(BaseModel):
+    learning_outcome_id: UUID
+    target_marks: int = Field(gt=0, le=1000)
+
+
 class BlueprintVersionCreate(BaseModel):
     subject_id: UUID
     title: str = Field(min_length=1, max_length=240)
@@ -39,6 +44,7 @@ class BlueprintVersionCreate(BaseModel):
     difficulty_distribution: dict[str, int]
     question_type_distribution: dict[str, int]
     topic_weights: list[BlueprintTopicWeightInput] = Field(min_length=1, max_length=100)
+    outcome_weights: list[BlueprintOutcomeWeightInput] = Field(min_length=1, max_length=200)
 
     @field_validator("title")
     @classmethod
@@ -83,6 +89,14 @@ class BlueprintTopicWeightResponse(BaseModel):
     target_marks: int
 
 
+class BlueprintOutcomeWeightResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    learning_outcome_id: UUID
+    target_marks: int
+
+
 class ExamBlueprintVersionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -102,6 +116,7 @@ class ExamBlueprintVersionResponse(BaseModel):
     approved_by: UUID | None
     approved_at: datetime | None
     topic_weights: list[BlueprintTopicWeightResponse]
+    outcome_weights: list[BlueprintOutcomeWeightResponse]
 
 
 class ExamBlueprintResponse(BaseModel):
