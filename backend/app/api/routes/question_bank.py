@@ -10,7 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import (\n    enforce_auth_rate_limit,\n    get_workspace_membership,\n    require_workspace_roles,\n)
+from app.api.dependencies import (
+    enforce_auth_rate_limit,
+    get_workspace_membership,
+    require_workspace_roles,
+)
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import (
