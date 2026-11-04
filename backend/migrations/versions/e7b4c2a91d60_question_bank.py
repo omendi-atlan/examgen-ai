@@ -60,7 +60,7 @@ def upgrade() -> None:
         sa.CheckConstraint("version_number > 0", name="ck_question_version_positive"),
         sa.CheckConstraint("marks BETWEEN 1 AND 100", name="ck_question_marks_range"),
         sa.CheckConstraint("review_status IN ('draft', 'approved', 'rejected')", name="ck_question_review_status"),
-        sa.CheckConstraint("question_type IN ('multiple_choice', 'multiple_select', 'true_false', 'fill_blank', 'short_answer', 'long_answer', 'numeric', 'matching', 'ordering', 'programming', 'diagram_interpretation', 'diagram_construction')", name="ck_question_type"),
+        sa.CheckConstraint("question_type IN ('multiple_choice', 'multiple_select', 'true_false', 'fill_blank', 'short_answer', 'long_answer', 'numeric', 'matching', 'ordering', 'programming')", name="ck_question_type"),
         sa.CheckConstraint("difficulty IN ('easy', 'medium', 'hard')", name="ck_question_difficulty"),
         sa.CheckConstraint("cognitive_level IN ('remember', 'understand', 'apply', 'analyze', 'evaluate', 'create')", name="ck_question_cognitive_level"),
     )
