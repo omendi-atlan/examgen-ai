@@ -45,22 +45,48 @@ def _split_text(text: str, locator: str, metadata: dict[str, object]) -> list[Ex
     return segments
 
 
-def extract_document(path: Path, extension: str) -> ExtractionResult:
+def extract_document(
+    path: Path, extension: str, *, enable_ocr: bool = False
+) -> ExtractionResult:
     """Extract source text while preserving stable structural locators."""
     if extension == ".pdf":
         reader = PdfReader(path, strict=True)
         segments = []
+        ocr_pages = []
+        ocr_unavailable = False
         for page_number, page in enumerate(reader.pages, start=1):
+            page_text = page.extract_text() or ""
+            if not page_text.strip() and enable_ocr:
+                try:
+                    import pypdfium2 as pdfium
+                    import pytesseract
+
+                    pdf_document = pdfium.PdfDocument(str(path))
+                    bitmap = pdf_document[page_number - 1].render(scale=2)
+                    page_text = pytesseract.image_to_string(bitmap.to_pil())
+                    if page_text.strip():
+                        ocr_pages.append(page_number)
+                    pdf_document.close()
+                except (ImportError, OSError, RuntimeError):
+                    ocr_unavailable = True
             segments.extend(
-                _split_text(page.extract_text() or "", f"page-{page_number}", {"page": page_number})
+                _split_text(
+                    page_text,
+                    f"page-{page_number}",
+                    {"page": page_number, "extraction_method": "ocr" if page_number in ocr_pages else "text_layer"},
+                )
             )
         return ExtractionResult(
-            parser_name="pypdf",
-            parser_version="5.x-compatible",
+            parser_name="pypdf+pytesseract" if ocr_pages else "pypdf",
+            parser_version="ocr-enabled",
             segments=segments,
             page_count=len(reader.pages),
-            metadata={"format": "pdf", "metadata": {str(k): str(v) for k, v in (reader.metadata or {}).items()}},
-            needs_ocr=not any(segment.text.strip() for segment in segments),
+            metadata={
+                "format": "pdf",
+                "metadata": {str(k): str(v) for k, v in (reader.metadata or {}).items()},
+                "ocr": {"performed": bool(ocr_pages), "pages": ocr_pages, "available": not ocr_unavailable},
+            },
+            needs_ocr=ocr_unavailable or not any(segment.text.strip() for segment in segments),
         )
 
     if extension == ".docx":
