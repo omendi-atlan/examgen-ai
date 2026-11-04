@@ -16,7 +16,6 @@ from app.core.database import get_db
 from app.models import (
     AcademicDocument,
     DocumentExtraction,
-    DocumentTextSegment,
     DocumentVersion,
     ExtractionStatus,
     LearningOutcome,
