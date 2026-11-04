@@ -19,7 +19,7 @@ SUPPORTED_TYPES = {
     ".txt": "text/plain",
     ".md": "text/markdown",
 }
-MAX_ARCHIVE_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+MAX_ARCHIVE_UNCOMPRESSED_BYTES = 80 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 5000
 
 
