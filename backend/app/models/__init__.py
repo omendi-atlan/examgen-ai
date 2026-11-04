@@ -18,6 +18,7 @@ from app.models.academic import (
     DocumentVersion,
     ExtractionJobStatus,
     ExtractionStatus,
+    LearningOutcome,
     Subject,
     Topic,
 )
@@ -46,6 +47,7 @@ __all__ = [
     "DocumentTopicClassification",
     "DocumentVersion",
     "ExtractionStatus",
+    "LearningOutcome",
     "ExtractionJobStatus",
     "DocumentProcessingJob",
     "MembershipRole",
