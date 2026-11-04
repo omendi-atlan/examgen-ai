@@ -240,6 +240,17 @@ def test_question_generation_rejects_unowned_private_sources(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from app.api.routes import question_bank
+
+    monkeypatch.setattr(
+        question_bank,
+        "get_settings",
+        lambda: SimpleNamespace(
+            openai_api_key=SecretStr("test-secret-key"),
+            openai_model="test-model",
+            question_generation_timeout_seconds=30,
+        ),
+    )
     context = create_source(client, "question-source-owner@example.test")
     outsider = create_source(client, "question-outsider@example.test")
     with Session(app.state.test_engine) as db:
