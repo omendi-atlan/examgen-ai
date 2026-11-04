@@ -1,10 +1,12 @@
 """Question-bank API tests for provenance, privacy, approval and blueprint generation."""
 
-from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 import pytest
+import httpx
+from pydantic import SecretStr
+
 from app.core.config import Settings
 from app.core.database import Base, get_db
 from app.main import app
@@ -14,18 +16,15 @@ from app.models import (
     DocumentTextSegment,
     DocumentVersion,
     ExtractionStatus,
-    LearningOutcome,
     MembershipRole,
     MembershipStatus,
-    QuestionVersion,
     Subject,
-    Topic,
     User,
     WorkspaceMembership,
 )
 from app.api.routes.question_bank import get_question_generation_service
 from app.schemas.question_bank import QuestionContentInput
-from app.services.question_generation import QuestionGenerationError, QuestionGenerationService
+from app.services.question_generation import (\n    QuestionGenerationError,\n    QuestionGenerationService,\n    validate_generated_set,\n)
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -112,7 +111,6 @@ def create_context(client: TestClient, label: str = "question-bank") -> dict:
 def add_source(
     context: dict,
     *,
-    email: str | None = None,
     visibility: str = "private",
     text: str = "A primary key uniquely identifies each row in a relational table.",
 ) -> tuple[UUID, UUID]:
@@ -479,3 +477,116 @@ async def test_question_generator_fails_closed_without_provider_credentials() ->
             source_segments=[],
         )
     assert error.value.status_code == 503
+
+
+def generated_item(topic_id: UUID, outcome_id: UUID, segment_id: UUID) -> dict:
+    return {
+        "topic_id": str(topic_id),
+        "learning_outcome_id": str(outcome_id),
+        "question_type": "multiple_choice",
+        "prompt": "Which key uniquely identifies each row in a relational table?",
+        "marks": 2,
+        "cognitive_level": "remember",
+        "difficulty": "easy",
+        "response_schema": {
+            "options": [
+                {"id": "A", "label": "Primary key"},
+                {"id": "B", "label": "Foreign key"},
+            ]
+        },
+        "answer_key": {"correct_option_id": "A"},
+        "model_answer": "The primary key uniquely identifies a row.",
+        "explanation": "A primary key uniquely identifies each row.",
+        "source_segment_ids": [str(segment_id)],
+    }
+
+
+def blueprint_for_generation(topic_id: UUID, outcome_id: UUID):
+    return SimpleNamespace(
+        title="Database fundamentals",
+        question_count=1,
+        total_marks=2,
+        cognitive_distribution={"remember": 100},
+        difficulty_distribution={"easy": 100},
+        question_type_distribution={"multiple_choice": 100},
+        topic_weights=[SimpleNamespace(topic_id=topic_id, target_marks=2)],
+        outcome_weights=[SimpleNamespace(learning_outcome_id=outcome_id, target_marks=2)],
+    )
+
+
+def test_generation_validation_enforces_exact_blueprint_and_source_coverage() -> None:
+    topic_id = uuid4()
+    outcome_id = uuid4()
+    segment_id = uuid4()
+    blueprint = blueprint_for_generation(topic_id, outcome_id)
+    validated = validate_generated_set(
+        raw={"questions": [generated_item(topic_id, outcome_id, segment_id)]},
+        blueprint_version=blueprint,
+        available_segment_ids={segment_id},
+    )
+    assert len(validated) == 1
+    assert validated[0]["content"].marks == 2
+
+    invalid = generated_item(topic_id, outcome_id, segment_id)
+    invalid["marks"] = 1
+    with pytest.raises(QuestionGenerationError) as error:
+        validate_generated_set(
+            raw={"questions": [invalid]},
+            blueprint_version=blueprint,
+            available_segment_ids={segment_id},
+        )
+    assert error.value.status_code == 422
+
+    invalid_source = generated_item(topic_id, outcome_id, uuid4())
+    with pytest.raises(QuestionGenerationError) as error:
+        validate_generated_set(
+            raw={"questions": [invalid_source]},
+            blueprint_version=blueprint,
+            available_segment_ids={segment_id},
+        )
+    assert error.value.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_openai_adapter_uses_server_secret_and_validates_structured_response() -> None:
+    topic_id = uuid4()
+    outcome_id = uuid4()
+    segment_id = uuid4()
+    blueprint = blueprint_for_generation(topic_id, outcome_id)
+    calls = []
+
+    def provider(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        assert request.url.host == "api.openai.com"
+        assert request.headers["Authorization"] == "Bearer test-provider-secret"
+        payload = __import__("json").loads(request.content)
+        assert "untrusted academic data" in payload["messages"][0]["content"]
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": __import__("json").dumps(
+                                {"questions": [generated_item(topic_id, outcome_id, segment_id)]}
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    service = QuestionGenerationService(
+        Settings(openai_api_key=SecretStr("test-provider-secret")),
+        transport=httpx.MockTransport(provider),
+    )
+    result = await service.generate(
+        blueprint_version=blueprint,
+        subject_name="Information Systems",
+        topic_context=[{"id": str(topic_id), "name": "Database Fundamentals"}],
+        outcome_context=[{"id": str(outcome_id), "code": "LO-DB-01", "description": "Explain keys."}],
+        source_segments=[{"id": str(segment_id), "locator": "page:1", "text": "Primary keys uniquely identify rows."}],
+    )
+    assert len(calls) == 1
+    assert len(result) == 1
+    assert result[0]["content"].question_type == "multiple_choice"
