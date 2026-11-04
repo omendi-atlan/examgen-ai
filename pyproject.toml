@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "examgen-ai-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "Authoritative Python API for the EXAMGEN AI platform."
 requires-python = ">=3.12"
 dependencies = [
@@ -16,6 +16,9 @@ dependencies = [
   "psycopg[binary]>=3.2,<4.0",
   "pwdlib[argon2]>=0.2,<1.0",
   "PyJWT>=2.10,<3.0",
+  "pypdf>=5.0,<7.0",
+  "python-docx>=1.1,<2.0",
+  "python-pptx>=1.0,<2.0",
 ]
 
 [project.optional-dependencies]
