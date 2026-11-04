@@ -22,7 +22,8 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Add shared PostgreSQL-backed login and registration rate limiting with 429/Retry-After responses and concurrent atomicity tests.
 - [x] Add role-based ingestion authorization, cross-workspace taxonomy isolation and fail-closed production configuration tests.
 - [x] Add PostgreSQL-backed cross-tenant document access, taxonomy isolation and role-authorization integration tests.
-- [ ] Complete the full route-by-route PostgreSQL authorization matrix and production ingress/edge rate-limit verification.
+- [x] Complete the route-by-route academic authorization and tenant-isolation matrix for upload, version, document, segment, taxonomy, classification and extraction-review endpoints.
+- [ ] Complete production ingress/edge rate-limit verification.
 - [ ] Complete representative document-load and OCR-heavy corpus throughput qualification.
 - [ ] Add server-side examination and attempt models with immutable versions.
 
