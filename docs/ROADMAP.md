@@ -61,8 +61,8 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
 - [x] Integrate workspace-scoped learning outcomes and immutable, versioned blueprint authoring with exact topic/outcome marks, cognitive/difficulty/question-type distributions and moderator approval.
-- [x] Add reusable, append-only question versions with explicit subject/topic/outcome mapping, source-segment provenance, content fingerprints, type-specific response contracts, server-side answer keys and rubric validation.
-- [x] Add private-by-default AI question generation from approved blueprints, with exact mark/topic/outcome/cognitive/difficulty/type distribution validation and source-citation checks.
+- [ ] Add reusable, append-only question versions with explicit subject/topic/outcome mapping, source-segment provenance, content fingerprints, type-specific response contracts, server-side answer keys and rubric validation (draft PR #28; awaiting full CI qualification).
+- [ ] Add private-by-default AI question generation from approved blueprints, with exact mark/topic/outcome/cognitive/difficulty/type distribution validation and source-citation checks (draft PR #28; awaiting full CI qualification).
 - [ ] Add formal examination assembly from approved question versions, immutable published paper snapshots and student-safe answer-key separation.
 
 ### Phase 4 — Visual intelligence and moderation
