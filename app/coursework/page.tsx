@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type Workspace = { id: string; name: string; slug: string };
@@ -21,7 +21,63 @@ type Resource = {
   versions: Version[];
 };
 
-const panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
+
+type ScannedPage = { jpeg: Uint8Array; width: number; height: number };
+
+async function buildScannedPdf(pages: ScannedPage[]): Promise<Blob> {
+  if (pages.length === 0) throw new Error("Capture at least one page before creating a PDF.");
+  const encoder = new TextEncoder();
+  const objects: Uint8Array[] = [];
+  const objectCount = 2 + pages.length * 3;
+  const offsets: number[] = [0];
+  let position = 0;
+  const chunks: Uint8Array[] = [encoder.encode("%PDF-1.4\n%EXAMGEN-SCAN\n")];
+  position += chunks[0].length;
+  const addObject = (id: number, body: Uint8Array[]) => {
+    offsets[id] = position;
+    const prefix = encoder.encode(`${id} 0 obj\n`);
+    const suffix = encoder.encode("\nendobj\n");
+    chunks.push(prefix, ...body, suffix);
+    position += prefix.length + body.reduce((sum, part) => sum + part.length, 0) + suffix.length;
+  };
+  const kids = pages.map((_, index) => `${3 + index * 3} 0 R`).join(" ");
+  addObject(1, [encoder.encode("<< /Type /Catalog /Pages 2 0 R >>")]);
+  addObject(2, [encoder.encode(`<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`)]);
+  pages.forEach((page, index) => {
+    const pageId = 3 + index * 3;
+    const contentId = pageId + 1;
+    const imageId = pageId + 2;
+    const width = 595.28;
+    const height = Math.max(1, width * page.height / page.width);
+    const content = encoder.encode(`q\n${width.toFixed(2)} 0 0 ${height.toFixed(2)} 0 0 cm\n/Im0 Do\nQ\n`);
+    addObject(pageId, [encoder.encode(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width.toFixed(2)} ${height.toFixed(2)}] /Resources << /XObject << /Im0 ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`,
+    )]);
+    addObject(contentId, [
+      encoder.encode(`<< /Length ${content.length} >>\nstream\n`),
+      content,
+      encoder.encode("endstream"),
+    ]);
+    addObject(imageId, [
+      encoder.encode(
+        `<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.jpeg.length} >>\nstream\n`,
+      ),
+      page.jpeg,
+      encoder.encode("\nendstream"),
+    ]);
+  });
+  const xrefOffset = position;
+  let xref = `xref\n0 ${objectCount + 1}\n0000000000 65535 f \n`;
+  for (let id = 1; id <= objectCount; id += 1) {
+    xref += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+  }
+  const trailer = encoder.encode(
+    `${xref}trailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`,
+  );
+  chunks.push(trailer);
+  return new Blob(chunks, { type: "application/pdf" });
+}
+\nconst panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
 const field = { width: "100%", padding: "11px 12px", marginTop: 6, borderRadius: 8, border: "1px solid #364154", background: "#0b1018", color: "#f4f6fa" } as const;
 const action = { border: 0, borderRadius: 8, padding: "11px 15px", background: "#ff8a35", color: "#20140b", fontWeight: 800, cursor: "pointer" } as const;
 
@@ -44,6 +100,45 @@ export default function CourseworkResourcesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [scanPages, setScanPages] = useState<ScannedPage[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStream = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!cameraOpen) return;
+    let cancelled = false;
+    async function startCamera() {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Camera scanning requires a supported browser and a secure HTTPS connection.");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        cameraStream.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        setCameraError("");
+      } catch (cause) {
+        setCameraError(cause instanceof Error ? cause.message : "Camera access was unavailable.");
+      }
+    }
+    void startCamera();
+    return () => {
+      cancelled = true;
+      cameraStream.current?.getTracks().forEach((track) => track.stop());
+      cameraStream.current = null;
+    };
+  }, [cameraOpen]);
 
   const base = apiBase.replace(/\/$/, "");
   async function api<T>(path: string, init: RequestInit = {}, auth = token): Promise<T> {
@@ -111,7 +206,54 @@ export default function CourseworkResourcesPage() {
     finally { setBusy(false); }
   }
 
-  async function uploadResource(event: FormEvent<HTMLFormElement>) {
+
+  async function captureScanPage() {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0 || video.videoHeight === 0) {
+      setCameraError("Wait for the camera preview before capturing a page.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError("This browser could not prepare the scan image.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Could not encode the scan image.")), "image/jpeg", 0.9);
+    });
+    setScanPages((current) => [...current, {
+      jpeg: new Uint8Array(await blob.arrayBuffer()),
+      width: canvas.width,
+      height: canvas.height,
+    }]);
+    setCameraError("");
+  }
+
+  function closeScanner() {
+    setCameraOpen(false);
+    cameraStream.current?.getTracks().forEach((track) => track.stop());
+    cameraStream.current = null;
+  }
+
+  async function useScannedPages() {
+    try {
+      const pdf = await buildScannedPdf(scanPages);
+      const scannedFile = new File([pdf], `coursework-scan-${new Date().toISOString().replace(/[:.]/g, "-")}.pdf`, {
+        type: "application/pdf",
+      });
+      setFile(scannedFile);
+      setScanPages([]);
+      closeScanner();
+      setNotice("Your scanned pages are ready as a PDF. Add a title and upload them to this subject.");
+    } catch (cause) {
+      setCameraError(cause instanceof Error ? cause.message : "Could not create the scanned PDF.");
+    }
+  }
+\n  async function uploadResource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file || !title.trim() || !workspaceId || !subjectId) {
       setError("Choose a workspace, subject, title and file."); return;
@@ -247,8 +389,22 @@ export default function CourseworkResourcesPage() {
             <form onSubmit={uploadResource}>
               <label style={{ display: "block", fontSize: 13 }}>Resource title<input required maxLength={240} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Week 4 — Database normalisation" style={field} /></label>
               <label style={{ display: "block", fontSize: 13, marginTop: 12 }}>Visibility<select value={visibility} onChange={(event) => setVisibility(event.target.value as "private" | "cohort")} style={field}><option value="private">Private — only me</option>{currentSubject?.resource_sharing_enabled && <option value="cohort">Share with enrolled cohort</option>}</select></label>
-              <label style={{ display: "block", fontSize: 13, marginTop: 12 }}>Upload or scan<input required type="file" accept=".pdf,.docx,.pptx,.txt,.md,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} style={{ ...field, padding: 8 }} /></label>
-              <p style={{ color: "#8793a5", fontSize: 11, lineHeight: 1.5 }}>Upload PDF, DOCX, PPTX, TXT or Markdown resources. Image-only PDFs are sent through OCR when available. Private is the default; camera scanning is not yet supported as a standalone workflow.</p>
+              <label style={{ display: "block", fontSize: 13, marginTop: 12 }}>Upload a resource<input required type="file" accept=".pdf,.docx,.pptx,.txt,.md,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} style={{ ...field, padding: 8 }} /></label>
+              <button type="button" onClick={() => { setCameraError(""); setScanPages([]); setCameraOpen(true); }} style={{ ...action, width: "100%", marginTop: 10, background: "#263747", color: "#eaf7ff" }}> <span aria-hidden="true">▣</span> Scan pages with camera</button>
+              {file && <p style={{ color: "#75d9a5", fontSize: 12 }}>Selected: {file.name}</p>}
+              <p style={{ color: "#8793a5", fontSize: 11, lineHeight: 1.5 }}>Camera scanning requires HTTPS and browser permission. Captured pages are assembled into a PDF and processed through the same malware scan and OCR pipeline. Private is the default.</p>
+              {cameraOpen && <div role="dialog" aria-label="Document scanner" aria-modal="true" style={{ border: "1px solid #364154", borderRadius: 10, padding: 12, marginTop: 12 }}>
+                <h3 style={{ fontSize: 15, marginTop: 0 }}>Document scanner</h3>
+                <video ref={videoRef} autoPlay muted playsInline style={{ width: "100%", maxHeight: 360, objectFit: "contain", background: "#05080d", borderRadius: 8 }} />
+                {cameraError && <p role="alert" style={{ color: "#ff9a9a", fontSize: 12 }}>{cameraError}</p>}
+                <p style={{ color: "#9aa5b5", fontSize: 12 }}>{scanPages.length} page(s) captured</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  <button type="button" onClick={() => void captureScanPage()} style={action}>Capture page</button>
+                  <button type="button" disabled={!scanPages.length} onClick={() => void useScannedPages()} style={action}>Create PDF ({scanPages.length})</button>
+                  <button type="button" onClick={closeScanner} style={{ ...action, background: "#293242", color: "#f4f6fa" }}>Close scanner</button>
+                </div>
+                {scanPages.length > 0 && <button type="button" onClick={() => setScanPages((current) => current.slice(0, -1))} style={{ ...action, marginTop: 8, background: "#422a2a", color: "#ffe2e2" }}>Remove last page</button>}
+              </div>}
               <button type="submit" disabled={busy || !file || !title.trim()} style={{ ...action, width: "100%" }}>{busy ? "Uploading…" : "Upload to this subject"}</button>
             </form>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 24 }}><h3 style={{ fontSize: 15, margin: 0 }}>Resources ({resources.length})</h3><button onClick={() => void refreshResources()} disabled={busy} style={{ ...action, padding: "7px 10px", fontSize: 12 }}>Refresh</button></div>
