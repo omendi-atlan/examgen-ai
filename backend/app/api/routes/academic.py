@@ -17,6 +17,7 @@ from app.models import (
     AcademicDocument,
     ClassificationMethod,
     DocumentExtraction,
+    DocumentExtractionReview,
     DocumentProcessingJob,
     DocumentTopicClassification,
     DocumentVersion,
@@ -33,6 +34,8 @@ from app.schemas.academic import (
     DocumentResponse,
     DocumentVersionResponse,
     ExtractionResponse,
+    ExtractionReviewRequest,
+    ExtractionReviewResponse,
     SubjectCreate,
     SubjectResponse,
     TextSegmentResponse,
@@ -623,3 +626,106 @@ def classify_document_version(
         )
         for assignment, topic in zip(assignments, topics, strict=True)
     ]
+
+
+@router.post(
+    "/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+    response_model=ExtractionReviewResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def review_document_extraction(
+    workspace_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+    payload: ExtractionReviewRequest,
+    db: DatabaseSession,
+    membership: WorkspaceEditor,
+) -> DocumentExtractionReview:
+    """Append an examiner's explicit extraction decision; never auto-approve."""
+    version = db.scalar(
+        select(DocumentVersion)
+        .join(AcademicDocument, AcademicDocument.id == DocumentVersion.document_id)
+        .where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+            AcademicDocument.workspace_id == workspace_id,
+        )
+        .options(selectinload(DocumentVersion.extraction))
+    )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Document version not found.")
+    extraction = version.extraction
+    if extraction is None or extraction.status in {
+        ExtractionStatus.QUEUED,
+        ExtractionStatus.PROCESSING,
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="Extraction must finish before it can be reviewed.",
+        )
+    if payload.decision == "accepted" and (
+        extraction.status != ExtractionStatus.EXTRACTED
+        or extraction.character_count == 0
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Only non-empty extracted text can be accepted. Reject it or reprocess the source.",
+        )
+    review = DocumentExtractionReview(
+        version_id=version_id,
+        decision=payload.decision,
+        rationale=payload.rationale,
+        reviewed_by=membership.user_id,
+    )
+    db.add(review)
+    db.flush()
+    record_audit_event(
+        db,
+        action=f"academic_document.extraction_{payload.decision}",
+        resource_type="academic_document_version",
+        resource_id=str(version_id),
+        actor_user_id=membership.user_id,
+        workspace_id=workspace_id,
+        event_data={
+            "review_id": str(review.id),
+            "decision": payload.decision,
+            "extraction_id": str(extraction.id),
+            "character_count": extraction.character_count,
+            "quality_outcome": extraction.quality_report.get("outcome"),
+        },
+    )
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@router.get(
+    "/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews",
+    response_model=list[ExtractionReviewResponse],
+)
+def list_document_extraction_reviews(
+    workspace_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+    db: DatabaseSession,
+    _membership: WorkspaceEditor,
+) -> list[DocumentExtractionReview]:
+    """Return the append-only examiner decision history for one workspace source version."""
+    version = db.scalar(
+        select(DocumentVersion)
+        .join(AcademicDocument, AcademicDocument.id == DocumentVersion.document_id)
+        .where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+            AcademicDocument.workspace_id == workspace_id,
+        )
+    )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Document version not found.")
+    return list(
+        db.scalars(
+            select(DocumentExtractionReview)
+            .where(DocumentExtractionReview.version_id == version_id)
+            .order_by(DocumentExtractionReview.created_at, DocumentExtractionReview.id)
+        ).all()
+    )
