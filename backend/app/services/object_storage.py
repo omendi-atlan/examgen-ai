@@ -54,7 +54,11 @@ def persist_file(source: Path, storage_key: str) -> None:
     if not settings.object_storage_bucket:
         raise RuntimeError("OBJECT_STORAGE_BUCKET is required for S3 storage.")
     client = _s3_client()
-    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    digest_state = hashlib.sha256()
+    with source.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest_state.update(chunk)
+    digest = digest_state.hexdigest()
     client.upload_file(
         str(source),
         settings.object_storage_bucket,
