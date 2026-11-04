@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
+from uuid import UUID
 
 
 @pytest.fixture
@@ -255,7 +256,7 @@ def test_upload_creates_one_durable_job_per_immutable_version(client: TestClient
     with Session(app.state.test_engine) as db:
         jobs = db.scalars(
             select(DocumentProcessingJob).where(
-                DocumentProcessingJob.version_id == version_id
+                DocumentProcessingJob.version_id == UUID(version_id)
             )
         ).all()
         assert len(jobs) == 1
