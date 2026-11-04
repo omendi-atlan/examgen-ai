@@ -33,6 +33,7 @@ class Question(Base):
     __tablename__ = "questions"
     __table_args__ = (
         Index("ix_questions_workspace_subject_owner", "workspace_id", "subject_id", "created_by"),
+        UniqueConstraint("workspace_id", "subject_id", "created_by", "fingerprint", name="uq_question_owner_fingerprint"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -46,6 +47,7 @@ class Question(Base):
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     current_version_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
