@@ -409,3 +409,115 @@ def test_classification_rejects_topic_from_another_workspace(client: TestClient)
         json={"topic_ids": [topic.json()["id"]], "rationale": "Attempted cross-tenant assignment."},
     )
     assert rejected.status_code == 422
+
+
+def _academic_route_matrix(
+    client: TestClient,
+    workspace_id: str,
+    document_id: str,
+    version_id: str,
+    subject_id: str,
+    topic_id: str,
+    token: str,
+) -> list[tuple[str, str, dict[str, object]]]:
+    """Build representative requests for every workspace-scoped academic route."""
+    headers = {"Authorization": f"Bearer {token}"}
+    return [
+        ("post", f"/api/v1/workspaces/{workspace_id}/documents", {
+            "headers": headers,
+            "data": {"title": "Authorization matrix upload"},
+            "files": {"file": ("matrix.txt", b"matrix source", "text/plain")},
+        }),
+        ("post", f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions", {
+            "headers": headers,
+            "files": {"file": ("matrix-v2.txt", b"matrix source version two", "text/plain")},
+        }),
+        ("get", f"/api/v1/workspaces/{workspace_id}/documents", {"headers": headers}),
+        ("get", f"/api/v1/workspaces/{workspace_id}/documents/{document_id}", {"headers": headers}),
+        ("get", f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/segments", {"headers": headers}),
+        ("post", f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects", {
+            "headers": headers,
+            "json": {"name": "Authorization Matrix Subject"},
+        }),
+        ("get", f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects", {"headers": headers}),
+        ("post", f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects/{subject_id}/topics", {
+            "headers": headers,
+            "json": {"name": "Authorization Matrix Topic"},
+        }),
+        ("get", f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects/{subject_id}/topics", {"headers": headers}),
+        ("put", f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/classifications", {
+            "headers": headers,
+            "json": {"topic_ids": [topic_id], "rationale": "Authorization matrix test"},
+        }),
+        ("post", f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews", {
+            "headers": headers,
+            "json": {"decision": "rejected", "rationale": "Authorization matrix test"},
+        }),
+        ("get", f"/api/v1/workspaces/{workspace_id}/documents/{document_id}/versions/{version_id}/extraction-reviews", {
+            "headers": headers,
+        }),
+    ]
+
+
+def _create_matrix_resources(client: TestClient, token: str, workspace_id: str) -> tuple[str, str, str]:
+    document = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"title": "Authorization matrix source"},
+        files={"file": ("matrix-source.txt", b"source text for authorization", "text/plain")},
+    )
+    assert document.status_code == 201
+    document_id = document.json()["id"]
+    version_id = document.json()["versions"][0]["id"]
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "Authorization matrix taxonomy"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+    topic = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects/{subject_id}/topics",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "Authorization matrix topic"},
+    )
+    assert topic.status_code == 201
+    return document_id, version_id, subject_id, topic.json()["id"]
+
+
+def test_all_academic_routes_require_editor_role(client: TestClient) -> None:
+    from app.models import MembershipRole, WorkspaceMembership
+
+    token, workspace_id = create_workspace(client, "route-matrix-student@example.test")
+    document_id, version_id, subject_id, topic_id = _create_matrix_resources(
+        client, token, workspace_id
+    )
+    with Session(app.state.test_engine) as db:
+        membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id)
+            )
+        )
+        assert membership is not None
+        membership.role = MembershipRole.STUDENT
+        db.commit()
+
+    for method, path, kwargs in _academic_route_matrix(
+        client, workspace_id, document_id, version_id, subject_id, topic_id, token
+    ):
+        response = getattr(client, method)(path, **kwargs)
+        assert response.status_code == 403, f"{method.upper()} {path}: {response.status_code} {response.text}"
+
+
+def test_all_academic_routes_hide_resources_from_other_workspaces(client: TestClient) -> None:
+    owner_token, owner_workspace = create_workspace(client, "route-matrix-owner@example.test")
+    outsider_token, outsider_workspace = create_workspace(client, "route-matrix-outsider@example.test")
+    document_id, version_id, subject_id, topic_id = _create_matrix_resources(
+        client, owner_token, owner_workspace
+    )
+
+    for method, path, kwargs in _academic_route_matrix(
+        client, outsider_workspace, document_id, version_id, subject_id, topic_id, outsider_token
+    ):
+        response = getattr(client, method)(path, **kwargs)
+        assert response.status_code == 404, f"{method.upper()} {path}: {response.status_code} {response.text}"
