@@ -35,7 +35,7 @@ Every extracted segment must retain its original source locator and metadata. Ac
 
 ## Processing and concurrency qualification
 
-CI runs PostgreSQL 16 migrations and concurrency tests. Worker qualification covers distinct concurrent job claims, expired-lease recovery, fencing-token ownership and atomic shared authentication rate limits. Extraction limits are enforced before output is persisted. Synthetic qualification covers a multi-megabyte PDF container, concurrent 256 KB text extraction and a three-page OCR fallback harness that verifies page locators and OCR provenance. The OCR harness isolates PDFium/Tesseract integration contracts; it is not a substitute for benchmarking a real scanned corpus or multiple worker replicas.
+CI runs PostgreSQL 16 migrations and concurrency tests. Worker qualification covers distinct concurrent job claims, expired-lease recovery, fencing-token ownership and atomic shared authentication rate limits. Extraction limits are enforced before output is persisted. Qualification covers a multi-megabyte PDF container, concurrent 256 KB text extraction, a three-page OCR fallback contract harness and a real Tesseract integration smoke test. The real OCR test creates image-only scanned PDF pages, runs two documents concurrently through PDFium/Tesseract, and asserts extracted text, per-page locators and OCR provenance. This is a deterministic CI smoke test, not a substitute for a representative production corpus benchmark or multiple worker replicas.
 
 ## Release caveats
 
