@@ -1,4 +1,7 @@
+"""Contract tests for the service health endpoints."""
+
 from fastapi.testclient import TestClient
+
 from app.api.routes import health
 from app.main import app
 
@@ -19,7 +22,9 @@ def test_readiness_returns_success_when_database_is_available(monkeypatch) -> No
     assert response.json() == {"status": "ready"}
 
 
-def test_readiness_returns_service_unavailable_when_database_is_down(monkeypatch) -> None:
+def test_readiness_returns_service_unavailable_when_database_is_down(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(health, "database_is_ready", lambda: False)
     response = client.get("/api/v1/health/ready")
     assert response.status_code == 503
