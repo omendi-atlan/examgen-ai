@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.academic import router as academic_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
-from app.api.routes.workspaces import router as workspaces_router
 from app.api.routes.student_coursework import router as student_coursework_router
+from app.api.routes.workspaces import router as workspaces_router
 from app.core.config import get_settings
 
 settings = get_settings()
