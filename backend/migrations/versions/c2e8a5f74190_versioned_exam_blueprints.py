@@ -11,6 +11,26 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
+        "learning_outcomes",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("workspace_id", sa.Uuid(), nullable=False),
+        sa.Column("topic_id", sa.Uuid(), nullable=False),
+        sa.Column("code", sa.String(length=40), nullable=False),
+        sa.Column("description", sa.Text(), nullable=False),
+        sa.Column("created_by", sa.Uuid(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["topic_id"], ["topics.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("topic_id", "code", name="uq_learning_outcome_topic_code"),
+    )
+    op.create_index(
+        "ix_learning_outcomes_workspace_topic",
+        "learning_outcomes",
+        ["workspace_id", "topic_id"],
+    )
+    op.create_table(
         "exam_blueprints",
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("workspace_id", sa.Uuid(), nullable=False),
@@ -77,6 +97,23 @@ def upgrade() -> None:
         sa.UniqueConstraint("version_id", "topic_id", name="uq_blueprint_version_topic_weight"),
         sa.CheckConstraint("target_marks > 0", name="ck_blueprint_topic_target_marks_positive"),
     )
+    op.create_table(
+        "blueprint_outcome_weights",
+        sa.Column("id", sa.Uuid(), nullable=False),
+        sa.Column("version_id", sa.Uuid(), nullable=False),
+        sa.Column("learning_outcome_id", sa.Uuid(), nullable=False),
+        sa.Column("target_marks", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(["version_id"], ["exam_blueprint_versions.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["learning_outcome_id"], ["learning_outcomes.id"], ondelete="RESTRICT"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("version_id", "learning_outcome_id", name="uq_blueprint_version_outcome_weight"),
+        sa.CheckConstraint("target_marks > 0", name="ck_blueprint_outcome_target_marks_positive"),
+    )
+    op.create_index(
+        "ix_blueprint_outcome_weights_outcome",
+        "blueprint_outcome_weights",
+        ["learning_outcome_id"],
+    )
     op.create_index(
         "ix_blueprint_topic_weights_topic",
         "blueprint_topic_weights",
@@ -85,9 +122,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index("ix_blueprint_outcome_weights_outcome", table_name="blueprint_outcome_weights")
+    op.drop_table("blueprint_outcome_weights")
     op.drop_index("ix_blueprint_topic_weights_topic", table_name="blueprint_topic_weights")
     op.drop_table("blueprint_topic_weights")
     op.drop_index("ix_blueprint_versions_subject_created", table_name="exam_blueprint_versions")
     op.drop_table("exam_blueprint_versions")
     op.drop_index("ix_exam_blueprints_workspace_updated", table_name="exam_blueprints")
     op.drop_table("exam_blueprints")
+    op.drop_index("ix_learning_outcomes_workspace_topic", table_name="learning_outcomes")
+    op.drop_table("learning_outcomes")
