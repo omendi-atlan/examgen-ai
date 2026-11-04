@@ -78,11 +78,27 @@
     }
   }
 
+  async function clearAttemptView() {
+    if (state.activeAttempt?.status === "in_progress" && !state.submitting) {
+      try {
+        await flushResponses();
+      } catch (error) {
+        setStatus("Some responses may not have saved before leaving this attempt: " + error.message, true);
+      }
+    }
+    if (state.timerId) window.clearInterval(state.timerId);
+    state.timerId = null;
+    for (const timer of state.saveTimers.values()) window.clearTimeout(timer);
+    state.saveTimers.clear();
+    state.activeAttempt = null;
+    state.responses = {};
+  }
+
   async function loadSubjects() {
+    await clearAttemptView();
     state.workspaceId = byId("workspace-select").value;
     state.subjectId = "";
     state.examId = "";
-    state.activeAttempt = null;
     byId("subject-select").disabled = true;
     byId("exam-select").disabled = true;
     byId("history-panel").hidden = true;
@@ -97,9 +113,9 @@
   }
 
   async function loadExams() {
+    await clearAttemptView();
     state.subjectId = byId("subject-select").value;
     state.examId = "";
-    state.activeAttempt = null;
     byId("exam-select").disabled = true;
     byId("history-panel").hidden = true;
     byId("attempt-panel").hidden = true;
@@ -119,8 +135,8 @@
   }
 
   async function loadHistory() {
+    await clearAttemptView();
     state.examId = byId("exam-select").value;
-    state.activeAttempt = null;
     byId("attempt-panel").hidden = true;
     if (!state.examId) {
       byId("history-panel").hidden = true;
