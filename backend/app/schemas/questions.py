@@ -16,8 +16,6 @@ QuestionType = Literal[
     "matching",
     "ordering",
     "programming",
-    "diagram_interpretation",
-    "diagram_construction",
 ]
 Difficulty = Literal["easy", "medium", "hard"]
 CognitiveLevel = Literal["remember", "understand", "apply", "analyze", "evaluate", "create"]
