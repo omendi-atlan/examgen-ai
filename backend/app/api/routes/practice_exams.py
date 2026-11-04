@@ -505,3 +505,35 @@ def submit_practice_attempt(
         db.commit()
         attempt = _load_attempt(db, workspace_id, subject_id, attempt_id, membership.user_id)
     return _attempt_response(attempt)
+
+
+@router.get(
+    "/workspaces/{workspace_id}/subjects/{subject_id}/practice-exams/{exam_id}/attempts",
+    response_model=list[PracticeAttemptResponseModel],
+    response_model_exclude_none=True,
+)
+def list_practice_attempts(
+    workspace_id: UUID,
+    subject_id: UUID,
+    exam_id: UUID,
+    db: DatabaseSession,
+    membership: ActiveMember,
+) -> list[PracticeAttemptResponseModel]:
+    """List only the authenticated student's attempts for their own practice exam."""
+    _load_exam(db, workspace_id, subject_id, exam_id, membership.user_id)
+    attempts = db.scalars(
+        select(PracticeAttempt)
+        .where(
+            PracticeAttempt.exam_id == exam_id,
+            PracticeAttempt.student_id == membership.user_id,
+        )
+        .options(
+            selectinload(PracticeAttempt.exam)
+            .selectinload(PracticeExam.questions)
+            .selectinload(PracticeExamQuestion.question_version),
+            selectinload(PracticeAttempt.responses),
+        )
+        .order_by(PracticeAttempt.started_at.desc())
+        .limit(20)
+    ).all()
+    return [_attempt_response(item) for item in attempts]
