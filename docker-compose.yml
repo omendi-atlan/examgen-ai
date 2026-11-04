@@ -1,0 +1,17 @@
+# Local compose stack. Run: docker compose up --build
+services:
+  examgen:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Change this before exposing the service to anyone else.
+      EXAMGEN_SECRET_KEY: "dev-only-secret-change-me-0123456789abcdef"
+      EXAMGEN_DATA_DIR: /data
+      EXAMGEN_MAX_UPLOAD_MB: "50"
+    volumes:
+      - examgen-data:/data
+    restart: unless-stopped
+
+volumes:
+  examgen-data:

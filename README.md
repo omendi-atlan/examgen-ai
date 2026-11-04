@@ -66,15 +66,7 @@ examgen serve --host 0.0.0.0 --port 8000
 Open <http://localhost:8000>, register a student account, create a subject
 workspace, and upload that subject's coursework.
 
-### Configuration
-
-| Variable | Purpose | Default |
-|---|---|---|
-| `EXAMGEN_DATA_DIR` | Uploads, extracted content and generated PDFs | `./data` |
-| `EXAMGEN_DATABASE_URL` | SQLAlchemy database URL | SQLite in the data dir |
-| `EXAMGEN_SECRET_KEY` | JWT signing key | development fallback |
-| `EXAMGEN_MAX_UPLOAD_MB` | Per-file upload limit | 25 |
-| `EXAMGEN_LLM_API_KEY` | Optional supplementary model access | unset |
+See [Deployment](#deployment) for the full environment variable reference.
 
 ## Command line
 
@@ -129,6 +121,65 @@ tests/          Milestone acceptance tests (M1–M8) plus CLI coverage
 
 Student-facing question payloads never include answer keys; authoring views are
 separate schemas. Memoranda are withheld in formal mode until released.
+
+## Deployment
+
+The application is a single FastAPI process with no external services, so it
+runs anywhere Python 3.10+ or Docker is available. All state lives under
+`EXAMGEN_DATA_DIR`, so **mount a persistent volume there** or the database,
+uploads and PDFs are lost on redeploy.
+
+`EXAMGEN_SECRET_KEY` is required in production. Without it each process mints a
+random key and every issued token is invalidated on restart.
+
+### Docker
+
+```bash
+docker build -t examgen .
+docker run -d --name examgen -p 8000:8000 \
+  -e EXAMGEN_SECRET_KEY="$(openssl rand -hex 32)" \
+  -v examgen-data:/data \
+  examgen
+```
+
+Or with Compose (see `docker-compose.yml`):
+
+```bash
+docker compose up --build
+```
+
+### Platform as a service
+
+`app.py` exposes a module-level `app`, and `Procfile` provides the web command,
+so Render, Railway, Heroku and Fly.io can deploy the repository directly.
+
+- Build: `pip install .`
+- Start: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+- Health check path: `/health`
+- Required env: `EXAMGEN_SECRET_KEY`
+- Recommended env: `EXAMGEN_DATA_DIR` pointing at a mounted disk
+
+### Environment variables
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `EXAMGEN_SECRET_KEY` | JWT signing key. **Required in production.** | random per process |
+| `EXAMGEN_DATA_DIR` | Database, uploads, assets, generated PDFs | `./data` |
+| `EXAMGEN_DATABASE_URL` | SQLAlchemy URL (e.g. Postgres) | SQLite in the data dir |
+| `EXAMGEN_MAX_UPLOAD_MB` | Per-file upload limit | 50 |
+| `EXAMGEN_TOKEN_TTL_MINUTES` | Access token lifetime | 720 |
+| `EXAMGEN_LLM_API_KEY` | Optional model access for supplementary knowledge | unset |
+| `EXAMGEN_ALLOW_SUPPLEMENTARY` | Permit external knowledge, clearly labelled | false |
+
+Without an LLM key the deterministic offline engine drives the whole workflow,
+so the platform is fully functional with no external API.
+
+### Scale-out note
+
+SQLite with a single process is the default and suits a single instance. To run
+multiple workers or replicas, point `EXAMGEN_DATABASE_URL` at Postgres **and**
+give every replica the same `EXAMGEN_DATA_DIR` on shared storage — uploads and
+generated PDFs are written to the filesystem, not the database.
 
 ## Tests
 

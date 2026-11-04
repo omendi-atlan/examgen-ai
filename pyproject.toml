@@ -35,7 +35,7 @@ examgen = "examgen.cli:main"
 include = ["examgen*"]
 
 [tool.setuptools.package-data]
-examgen = ["static/*", "templates/*"]
+examgen = ["static/**/*", "templates/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
