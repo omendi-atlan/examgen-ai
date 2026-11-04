@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, "architecture/**"]
+    branches: [main, "architecture/**", "build/**"]
   pull_request:
-    branches: [main, "architecture/**"]
+    branches: [main, "architecture/**", "build/**"]
 
 jobs:
   validate-frontend:
