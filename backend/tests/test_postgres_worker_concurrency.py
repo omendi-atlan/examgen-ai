@@ -6,6 +6,20 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
+from fastapi import HTTPException
+from starlette.requests import Request
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+
+from app.api.dependencies import enforce_auth_rate_limit
+from app.core.database import Base
+from app.models import (
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
+from uuid import UUID, uuid4
+
+import pytest
 from app.core.database import Base
 from app.models import (
     AcademicDocument,
