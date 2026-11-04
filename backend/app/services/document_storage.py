@@ -91,7 +91,7 @@ async def store_upload(
                 size += len(chunk)
                 if size > max_bytes:
                     raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                         detail="Upload exceeds the configured size limit.",
                     )
                 digest.update(chunk)
