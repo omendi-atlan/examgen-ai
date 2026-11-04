@@ -141,3 +141,44 @@ def test_workspace_endpoints_require_authentication(client: TestClient) -> None:
         "/api/v1/workspaces",
         json={"name": "No Access", "slug": "no-access"},
     ).status_code == 401
+
+
+def test_login_rate_limit_is_enforced_and_returns_retry_after(client: TestClient) -> None:
+    register(client, "limited@example.test")
+    for _ in range(10):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "limited@example.test", "password": "incorrect"},
+        )
+        assert response.status_code == 401
+
+    limited = client.post(
+        "/api/v1/auth/login",
+        json={"email": "limited@example.test", "password": "incorrect"},
+    )
+    assert limited.status_code == 429
+    assert int(limited.headers["Retry-After"]) > 0
+
+
+def test_registration_rate_limit_is_enforced(client: TestClient) -> None:
+    for index in range(5):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": f"new-{index}@example.test",
+                "display_name": "New User",
+                "password": "Correct-Horse-Battery-9!",
+            },
+        )
+        assert response.status_code == 201
+
+    limited = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sixth@example.test",
+            "display_name": "New User",
+            "password": "Correct-Horse-Battery-9!",
+        },
+    )
+    assert limited.status_code == 429
+    assert int(limited.headers["Retry-After"]) > 0
