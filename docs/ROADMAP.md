@@ -21,7 +21,9 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Add registration, login, short-lived signed access tokens and workspace membership enforcement.
 - [x] Add shared PostgreSQL-backed login and registration rate limiting with 429/Retry-After responses and concurrent atomicity tests.
 - [x] Add role-based ingestion authorization, cross-workspace taxonomy isolation and fail-closed production configuration tests.
-- [ ] Complete broader PostgreSQL tenant-isolation, edge rate-limiting and representative document-load/OCR throughput qualification.
+- [x] Add PostgreSQL-backed cross-tenant document access, taxonomy isolation and role-authorization integration tests.
+- [ ] Complete the full route-by-route PostgreSQL authorization matrix and production ingress/edge rate-limit verification.
+- [ ] Complete representative document-load and OCR-heavy corpus throughput qualification.
 - [ ] Add server-side examination and attempt models with immutable versions.
 
 ### Phase 2 — Academic ingestion and subject intelligence (implementation in progress)
@@ -43,7 +45,8 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Enforce PDF page, OCR pixel/time, presentation slide, Office archive expansion/ratio and extracted-character limits.
 - [x] Add expiring worker leases, attempt accounting, expired-job recovery and fencing tokens to prevent stale workers committing results.
 - [x] Add source-addressable segment locator and immutable-version provenance acceptance coverage.
-- [ ] Complete representative document-load/OCR throughput tests and production ingress/edge rate-limit verification.
+- [x] Add concurrent extraction stress coverage for four 256 KB academic text sources and explicit PowerPoint slide/shape citation locators.
+- [ ] Complete realistic multi-megabyte PDF and OCR-heavy scan throughput tests with multiple worker replicas.
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
 - Blueprint constraints, question lifecycle, provenance, deduplication, model answers and rubrics.
