@@ -32,7 +32,7 @@
 - Run the worker with `python -m app.worker` in a separate process/container.
 - API and worker must share the same PostgreSQL database and private document volume.
 - Worker concurrency relies on PostgreSQL `FOR UPDATE SKIP LOCKED`; SQLite is for unit tests, not multi-worker production.
-- Configure `DOCUMENT_JOB_LEASE_SECONDS` longer than the maximum expected bounded processing time. The default is one hour; jobs with expired leases are recovered by the next worker poll.
+- Configure `DOCUMENT_JOB_LEASE_SECONDS` for the expected bounded processing time. The default is one hour; a dedicated heartbeat session renews active leases during long-running extraction, and expired leases are recovered by the next worker poll.
 - The worker loop logs and backs off on transient database errors; the container restart policy covers process termination.
 - OCR uses Tesseract and PDFium. The worker image installs the Tesseract executable; OCR is applied to pages without selectable text.
 - Keep Tesseract available on the worker PATH. Do not enable untrusted PDF JavaScript or embedded actions.
