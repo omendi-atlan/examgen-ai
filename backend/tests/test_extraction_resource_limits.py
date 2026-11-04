@@ -1,6 +1,5 @@
 """Resource-bound extraction regression tests."""
 
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -166,3 +165,65 @@ def test_ocr_fallback_preserves_page_provenance_for_every_scanned_page(
         {"page": 2, "extraction_method": "ocr", "start_char": 0, "end_char": 18},
         {"page": 3, "extraction_method": "ocr", "start_char": 0, "end_char": 18},
     ]
+
+
+def test_real_scanned_pdf_ocr_runs_concurrently_and_preserves_page_locators(
+    tmp_path: Path,
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from PIL import Image, ImageDraw, ImageFont
+
+    font = ImageFont.load_default(size=48)
+    sources = []
+    for document_index in range(2):
+        pages = []
+        for page_number in range(1, 3):
+            image = Image.new("RGB", (1200, 1600), "white")
+            draw = ImageDraw.Draw(image)
+            draw.text(
+                (70, 100),
+                f"EXAMGEN ACADEMIC MODULE {document_index + 1}",
+                fill="black",
+                font=font,
+            )
+            draw.text(
+                (70, 230),
+                f"SCANNED COURSE PAGE {page_number}",
+                fill="black",
+                font=font,
+            )
+            draw.text(
+                (70, 360),
+                "DATABASE NORMALIZATION AND RELATIONAL DESIGN",
+                fill="black",
+                font=font,
+            )
+            pages.append(image)
+        source = tmp_path / f"scanned-module-{document_index}.pdf"
+        pages[0].save(
+            source,
+            format="PDF",
+            resolution=150,
+            save_all=True,
+            append_images=pages[1:],
+        )
+        sources.append(source)
+
+    def extract(source: Path):
+        return document_extraction.extract_document(source, ".pdf", enable_ocr=True)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        results = list(workers.map(extract, sources))
+
+    assert len(results) == 2
+    for result in results:
+        assert result.page_count == 2
+        assert result.parser_name == "pypdf+pytesseract"
+        assert len(result.segments) == 2
+        assert [segment.locator for segment in result.segments] == [
+            "page-1:chars-1-" + str(len(result.segments[0].text)),
+            "page-2:chars-1-" + str(len(result.segments[1].text)),
+        ]
+        assert all(segment.text.strip() for segment in result.segments)
+        assert all(segment.metadata["extraction_method"] == "ocr" for segment in result.segments)
+        assert all("EXAMGEN" in segment.text.upper() for segment in result.segments)
