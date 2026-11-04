@@ -58,6 +58,25 @@ def create_workspace(
     return workspace
 
 
+@router.get("", response_model=list[WorkspaceResponse])
+def list_workspaces(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Workspace]:
+    """List only active workspaces in which the current user has active membership."""
+    statement = (
+        select(Workspace)
+        .join(WorkspaceMembership)
+        .where(
+            WorkspaceMembership.user_id == current_user.id,
+            WorkspaceMembership.status == MembershipStatus.ACTIVE,
+            Workspace.is_active.is_(True),
+        )
+        .order_by(Workspace.name)
+    )
+    return list(db.scalars(statement).all())
+
+
 @router.get("/{workspace_id}", response_model=WorkspaceResponse)
 def read_workspace(
     workspace_id: UUID,
