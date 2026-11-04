@@ -3,7 +3,7 @@
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -40,7 +40,7 @@ def postgres_sessions():
         engine.dispose()
 
 
-def _queued_jobs(factory, count: int) -> list[uuid4]:
+def _queued_jobs(factory, count: int) -> list[UUID]:
     with factory() as db:
         user = User(email=f"{uuid4()}@example.test", display_name="Worker test")
         workspace = Workspace(name="Worker tests", slug=f"worker-{uuid4().hex[:12]}")
