@@ -35,6 +35,10 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 ActiveMember = Annotated[WorkspaceMembership, Depends(get_workspace_membership)]
 
 
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
 def _exam_response(exam: PracticeExam) -> PracticeExamResponse:
     return PracticeExamResponse(
         id=exam.id,
@@ -234,7 +238,7 @@ def _finalise_attempt(
     attempt.submitted_at = now
     attempt.status = (
         PracticeAttemptStatus.EXPIRED
-        if now >= attempt.expires_at
+        if now >= _as_utc(attempt.expires_at)
         else PracticeAttemptStatus.SUBMITTED
     )
     record_audit_event(
@@ -421,7 +425,7 @@ def get_practice_attempt(
     membership: ActiveMember,
 ) -> PracticeAttemptResponseModel:
     attempt = _load_attempt(db, workspace_id, subject_id, attempt_id, membership.user_id, lock=True)
-    if attempt.status == PracticeAttemptStatus.IN_PROGRESS and datetime.now(UTC) >= attempt.expires_at:
+    if attempt.status == PracticeAttemptStatus.IN_PROGRESS and datetime.now(UTC) >= _as_utc(attempt.expires_at):
         _finalise_attempt(db, attempt, now=datetime.now(UTC))
         db.commit()
         attempt = _load_attempt(db, workspace_id, subject_id, attempt_id, membership.user_id)
@@ -445,7 +449,7 @@ def save_practice_response(
     now = datetime.now(UTC)
     if attempt.status != PracticeAttemptStatus.IN_PROGRESS:
         raise HTTPException(status_code=409, detail="This practice attempt is already finalised.")
-    if now >= attempt.expires_at:
+    if now >= _as_utc(attempt.expires_at):
         _finalise_attempt(db, attempt, now=now)
         db.commit()
         raise HTTPException(status_code=409, detail="The practice attempt time has expired and the attempt was finalised.")
