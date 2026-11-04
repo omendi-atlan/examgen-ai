@@ -134,16 +134,3 @@ def _verify_file(path: Path, expected_size: int | None, expected_sha256: str | N
                 digest.update(chunk)
         if digest.hexdigest() != expected_sha256:
             raise ValueError("Stored academic source checksum does not match its database record.")
-
-
-def _verify_file(path: Path, expected_size: int | None, expected_sha256: str | None) -> None:
-    """Verify a stored object against immutable database metadata before parsing."""
-    if expected_size is not None and path.stat().st_size != expected_size:
-        raise ValueError("Stored academic source size does not match its database record.")
-    if expected_sha256 is not None:
-        digest = hashlib.sha256()
-        with path.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-        if digest.hexdigest() != expected_sha256:
-            raise ValueError("Stored academic source checksum does not match its database record.")
