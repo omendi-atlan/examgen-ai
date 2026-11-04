@@ -223,4 +223,4 @@ class QuestionGenerationResponse(BaseModel):
     blueprint_version_id: UUID
     generated_count: int
     total_marks: int
-    questions: list[QuestionAuthoringResponse]
+    questions: list[QuestionResponse]
