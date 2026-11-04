@@ -713,3 +713,105 @@ def test_coursework_cohort_sharing_requires_staff_policy(client: TestClient) -> 
         files={"file": ("notes.txt", b"Shared notes", "text/plain")},
     )
     assert denied.status_code == 409
+
+
+def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled(
+    client: TestClient,
+) -> None:
+    from app.models import MembershipRole, MembershipStatus, User, WorkspaceMembership
+
+    owner_token, workspace_id = create_workspace(client, "coursework-cohort-owner@example.test")
+    owner_headers = {"Authorization": f"Bearer {owner_token}"}
+    subject = client.post(
+        f"/api/v1/workspaces/{workspace_id}/taxonomy/subjects",
+        headers=owner_headers,
+        json={"name": "Cohort Sharing Module"},
+    )
+    assert subject.status_code == 201
+    subject_id = subject.json()["id"]
+
+    enabled = client.put(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
+        headers=owner_headers,
+        json={"enabled": True},
+    )
+    assert enabled.status_code == 200
+    assert enabled.json()["resource_sharing_enabled"] is True
+
+    second_email = "coursework-cohort-member@example.test"
+    assert client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": second_email,
+            "display_name": "Cohort member",
+            "password": "Correct-Horse-Battery-9!",
+        },
+    ).status_code == 201
+    second_login = client.post(
+        "/api/v1/auth/login",
+        json={"email": second_email, "password": "Correct-Horse-Battery-9!"},
+    )
+    assert second_login.status_code == 200
+    second_headers = {"Authorization": f"Bearer {second_login.json()['access_token']}"}
+
+    with Session(app.state.test_engine) as db:
+        owner_membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id),
+                WorkspaceMembership.user_id == UUID(
+                    client.get("/api/v1/workspaces", headers=owner_headers).json()[0]["id"]
+                ) if False else WorkspaceMembership.user_id.is_not(None),
+            )
+        )
+        assert owner_membership is not None
+        owner_membership.role = MembershipRole.STUDENT
+        second_user = db.scalar(select(User).where(User.email == second_email))
+        assert second_user is not None
+        db.add(
+            WorkspaceMembership(
+                workspace_id=UUID(workspace_id),
+                user_id=second_user.id,
+                role=MembershipRole.STUDENT,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+        db.commit()
+
+    shared = client.post(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=owner_headers,
+        data={"title": "Approved cohort notes", "visibility": "cohort"},
+        files={"file": ("cohort.txt", b"Notes shared by the lecturer-approved cohort policy.", "text/plain")},
+    )
+    assert shared.status_code == 201, shared.text
+    resource_id = shared.json()["id"]
+
+    visible = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
+        headers=second_headers,
+    )
+    assert visible.status_code == 200
+    assert resource_id in [item["id"] for item in visible.json()]
+
+    with Session(app.state.test_engine) as db:
+        owner_membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id),
+                WorkspaceMembership.user_id == UUID(shared.json()["created_by"]),
+            )
+        )
+        assert owner_membership is not None
+        owner_membership.role = MembershipRole.OWNER
+        db.commit()
+
+    disabled = client.put(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
+        headers=owner_headers,
+        json={"enabled": False},
+    )
+    assert disabled.status_code == 200
+    hidden = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources/{resource_id}",
+        headers=second_headers,
+    )
+    assert hidden.status_code == 404
