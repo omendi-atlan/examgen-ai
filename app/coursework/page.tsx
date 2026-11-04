@@ -252,7 +252,7 @@ export default function CourseworkResourcesPage() {
     cameraStream.current = null;
   }
 
-  async function useScannedPages() {
+  async function applyScannedPages() {
     try {
       const pdf = await buildScannedPdf(scanPages);
       const scannedFile = new File([pdf], `coursework-scan-${new Date().toISOString().replace(/[:.]/g, "-")}.pdf`, {
@@ -414,7 +414,7 @@ export default function CourseworkResourcesPage() {
                 <p style={{ color: "#9aa5b5", fontSize: 12 }}>{scanPages.length} page(s) captured</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   <button type="button" onClick={() => void captureScanPage()} style={action}>Capture page</button>
-                  <button type="button" disabled={!scanPages.length} onClick={() => void useScannedPages()} style={action}>Create PDF ({scanPages.length})</button>
+                  <button type="button" disabled={!scanPages.length} onClick={() => void applyScannedPages()} style={action}>Create PDF ({scanPages.length})</button>
                   <button type="button" onClick={closeScanner} style={{ ...action, background: "#293242", color: "#f4f6fa" }}>Close scanner</button>
                 </div>
                 {scanPages.length > 0 && <button type="button" onClick={() => setScanPages((current) => current.slice(0, -1))} style={{ ...action, marginTop: 8, background: "#422a2a", color: "#ffe2e2" }}>Remove last page</button>}
