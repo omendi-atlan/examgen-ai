@@ -616,6 +616,13 @@ def test_student_coursework_resources_are_private_and_subject_scoped(client: Tes
         owner_membership.role = MembershipRole.STUDENT
         db.commit()
 
+    available_subjects = client.get(
+        f"/api/v1/workspaces/{workspace_id}/subjects",
+        headers=owner_headers,
+    )
+    assert available_subjects.status_code == 200
+    assert subject_id in [item["id"] for item in available_subjects.json()]
+
     uploaded = client.post(
         f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resources",
         headers=owner_headers,
@@ -790,6 +797,13 @@ def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled
     )
     assert visible.status_code == 200
     assert resource_id in [item["id"] for item in visible.json()]
+
+    student_policy_denied = client.put(
+        f"/api/v1/workspaces/{workspace_id}/subjects/{subject_id}/resource-sharing",
+        headers=owner_headers,
+        json={"enabled": False},
+    )
+    assert student_policy_denied.status_code == 403
 
     with Session(app.state.test_engine) as db:
         owner_membership = db.scalar(
