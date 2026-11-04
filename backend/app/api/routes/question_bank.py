@@ -199,7 +199,7 @@ async def generate_subject_questions(
         for segment in extraction.segments:
             source_segments.append(
                 {
-                    "segment_id": segment.id,
+                    "segment_id": str(segment.id),
                     "locator": segment.locator,
                     "text": segment.text,
                 }
@@ -210,7 +210,7 @@ async def generate_subject_questions(
                 "version_number": version.version_number,
                 "locator": segment.locator,
                 "segment_id": segment.id,
-                "source_version_id": version.id,
+                "source_version_id": str(version.id),
             }
     if not source_segments:
         raise HTTPException(status_code=422, detail="Selected sources contain no usable extracted text.")
