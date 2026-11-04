@@ -1,1 +1,1 @@
-Shared application infrastructure.
+"""Shared application infrastructure."""
