@@ -459,7 +459,7 @@ def _academic_route_matrix(
     ]
 
 
-def _create_matrix_resources(client: TestClient, token: str, workspace_id: str) -> tuple[str, str, str]:
+def _create_matrix_resources(client: TestClient, token: str, workspace_id: str) -> tuple[str, str, str, str]:
     document = client.post(
         f"/api/v1/workspaces/{workspace_id}/documents",
         headers={"Authorization": f"Bearer {token}"},
