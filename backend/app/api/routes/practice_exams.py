@@ -312,6 +312,8 @@ def create_practice_exam(
     by_id = {item.id: item for item in versions}
     ordered = [by_id[item] for item in payload.question_version_ids]
     total_marks = sum(item.marks for item in ordered)
+    if total_marks > 1000:
+        raise HTTPException(status_code=422, detail="Practice exam total marks cannot exceed 1,000.")
     exam = PracticeExam(
         workspace_id=workspace_id,
         subject_id=subject_id,
@@ -377,6 +379,7 @@ def list_practice_exams(
 @router.post(
     "/workspaces/{workspace_id}/subjects/{subject_id}/practice-exams/{exam_id}/attempts",
     response_model=PracticeAttemptResponseModel,
+    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
 )
 def start_practice_attempt(
@@ -416,6 +419,7 @@ def start_practice_attempt(
 @router.get(
     "/workspaces/{workspace_id}/subjects/{subject_id}/practice-attempts/{attempt_id}",
     response_model=PracticeAttemptResponseModel,
+    response_model_exclude_none=True,
 )
 def get_practice_attempt(
     workspace_id: UUID,
