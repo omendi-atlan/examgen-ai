@@ -16,8 +16,11 @@ from app.models import (
     Workspace,
 )
 from app.services import document_processing
-from app.services.document_processing import claim_next_job, recover_expired_jobs\nfrom app.api.dependencies import enforce_auth_rate_limit
-from fastapi import HTTPException\nfrom starlette.requests import Request\nfrom sqlalchemy import create_engine, select
+from app.services.document_processing import claim_next_job, recover_expired_jobs
+from app.api.dependencies import enforce_auth_rate_limit
+from fastapi import HTTPException
+from starlette.requests import Request
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
