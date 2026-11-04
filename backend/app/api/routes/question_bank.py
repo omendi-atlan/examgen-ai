@@ -282,6 +282,7 @@ async def generate_subject_questions(
                 review_status=QuestionReviewStatus.DRAFT,
             )
             db.add(version)
+            db.flush()
             question.current_version_number = 1
             record_audit_event(
                 db,
