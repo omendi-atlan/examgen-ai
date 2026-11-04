@@ -14,7 +14,6 @@ from app.models import (
     DocumentExtraction,
     DocumentProcessingJob,
     DocumentTextSegment,
-    DocumentVersion,
     ExtractionJobStatus,
     ExtractionStatus,
 )
