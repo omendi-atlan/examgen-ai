@@ -4,7 +4,7 @@ The approved target scope, module contracts and reusable prompt/skill catalogue 
 
 ## Current foundation — release 0.3.0
 
-The repository has a Next.js student workspace, transitional TypeScript Cloudflare Worker, authoritative Python API, PostgreSQL persistence, workspace identity and academic ingestion. Persistent examination attempts, reusable question-bank workflows, visual approval, comprehensive moderation, analytics and PDF exports remain future delivery.
+The repository has a Next.js coursework/authoring workspace, transitional TypeScript Cloudflare Worker, authoritative Python API, PostgreSQL persistence, secure academic ingestion, source-grounded question generation and the first timed practice-exam workflow. Visual approval, comprehensive moderation, subjective marking, analytics and PDF exports remain future delivery.
 
 ## Approved delivery phases
 
@@ -25,7 +25,7 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Complete the route-by-route academic authorization and tenant-isolation matrix for upload, version, document, segment, taxonomy, classification and extraction-review endpoints.
 - [ ] Complete production ingress/edge rate-limit verification.
 - [ ] Complete representative document-load and OCR-heavy corpus throughput qualification.
-- [ ] Add server-side examination and attempt models with immutable versions.
+- [x] Add immutable practice examination snapshots, durable attempt and response models, server-authoritative expiry, autosave and deterministic objective scoring.
 
 ### Phase 2 — Academic ingestion and subject intelligence (implementation in progress)
 - [x] Secure workspace-scoped uploads for PDF, DOCX, PPTX, TXT and Markdown.
@@ -58,18 +58,36 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Add concurrent extraction stress coverage for four 256 KB academic text sources and explicit PowerPoint slide/shape citation locators.
 - [ ] Complete realistic multi-megabyte PDF and OCR-heavy scan throughput tests with multiple worker replicas.
 
-### Phase 3 — Blueprint, question bank and answer intelligence
-- Blueprint constraints, question lifecycle, provenance, deduplication, model answers and rubrics.
+### Phase 3 — Blueprint, question bank and answer intelligence (implementation in progress)
+- [x] Add explicit learning outcomes under the canonical subject/topic taxonomy.
+- [x] Add immutable versioned examination blueprints with duration, marks, question counts, topic/outcome allocation and moderation metadata.
+- [x] Add private student-owned question-bank identities and immutable question versions.
+- [x] Generate source-grounded questions from selected, fully extracted subject resources through a server-side AI provider adapter.
+- [x] Retain source-segment/page citations, model/prompt provenance, marking answers and explanations.
+- [x] Validate question types, objective options, type-specific answer structures, difficulty, cognitive level, question count and exact mark totals.
+- [x] Add per-student subject-bank duplicate prevention and AI generation rate limits.
+- [x] Keep answer keys and explanations out of student question-bank list responses.
+- [ ] Add question moderation, approved question publication and rubric governance for formal examinations.
+- [ ] Add diagram requirement analysis and visual generation/approval gates.
+- [ ] Add robust multi-provider staging qualification and representative generation quality evaluation.
 
 ### Phase 4 — Visual intelligence and moderation
 - Visual requirement analysis, generation adapter, validation, approval workflow and moderation report.
 - Required visuals block publication until approval.
 
-### Phase 5 — HTML/CSS/JavaScript examination delivery
-- Versioned student examination packages, type-matched response controls, accessibility, timer and autosave.
+### Phase 5 — HTML/CSS/JavaScript examination delivery (practice MVP implemented)
+- [x] Deliver the timed student practice runner as a standalone semantic HTML/CSS/vanilla JavaScript package, separate from the Next.js authoring shell.
+- [x] Add type-matched controls for multiple choice, multiple select, true/false, numeric, fill-in and written responses.
+- [x] Add durable attempt retrieval/resume, debounced autosave and server-authoritative expiry.
+- [ ] Complete browser-level accessibility and real-device qualification.
+- [ ] Add formal examination package versioning, accommodation support and secure high-stakes delivery controls.
 
-### Phase 6 — Submission and marking
-- Server-authoritative timing, durable submission, deterministic objective scoring and rubric-assisted subjective marking.
+### Phase 6 — Submission and marking (practice objective MVP implemented)
+- [x] Persist immutable student submissions and finalisation timestamps.
+- [x] Deterministically mark multiple-choice, multiple-select, true/false, numeric and fill-in responses after submission.
+- [x] Release answer keys and explanations only after submission or server-side expiry finalisation.
+- [x] Keep written and complex responses in a pending-review state instead of inventing marks.
+- [ ] Implement rubric-assisted subjective marking, marker review and moderation history.
 
 ### Phase 7 — Analytics and personalised revision
 - Topic/outcome performance, error analysis, adaptive practice and spaced revision.
@@ -88,7 +106,9 @@ See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICA
 
 ## Student coursework resource experience — product requirement
 
-**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Current head `974dd6c0c23e3f3f982b613a71b3927abe24b69a` passes GitHub Actions CI: Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. The dashboard supports upload, multi-page camera-to-PDF capture, processing status, extracted text, version append, authorised download and owner-controlled retry. The PR is not merged or deployed. Browser-level E2E/accessibility and real-device camera qualification remain open.
+**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Current head `a96b5aa2c8a61057f740611ba5c6e225fbd4dfbd` passes GitHub Actions CI: Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. The dashboard supports upload, multi-page camera-to-PDF capture, processing status, extracted text, version append, authorised download and owner-controlled retry. The PR is not merged or deployed. Browser-level E2E/accessibility and real-device camera qualification remain open.
+
+**Assessment implementation status:** Draft PR #25 adds learning outcomes, versioned blueprints, source-grounded question generation, a private question bank, immutable practice exam snapshots, durable attempts, autosave, server-side timing and deterministic objective marking. Its expanded CI and real-provider staging qualification are pending; do not treat these features as production-qualified until those gates pass.
 
 Academic resource ingestion is a feature inside the student's existing subject/module coursework experience. A student opens a subject or module and uses its normal **Upload resource** or **Scan resource** action to add lecture notes, slides, prescribed readings, worksheets, diagrams or previous assessments. EXAMGEN AI performs validation, malware scanning, extraction/OCR, provenance capture and processing asynchronously in the background. The student sees progress and usable extracted material in that same coursework context. This is not a separate ingestion portal and does not require the student to operate taxonomy or examiner-review tooling.
 
