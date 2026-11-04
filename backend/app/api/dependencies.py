@@ -1,18 +1,23 @@
 """Reusable authentication and workspace-authorization dependencies."""
 
+import hashlib
+import time
 from collections.abc import Callable
 from typing import Annotated
 from uuid import UUID
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import case, delete, select
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models import (
+    ApiRateLimitBucket,
     MembershipRole,
     MembershipStatus,
     User,
@@ -86,3 +91,76 @@ def require_workspace_roles(
         return membership
 
     return dependency
+
+
+def enforce_auth_rate_limit(
+    request: Request,
+    db: DatabaseSession,
+    *,
+    scope: str,
+    subject: str,
+    limit: int,
+    window_seconds: int,
+) -> None:
+    """Atomically enforce a shared fixed-window limit across API processes."""
+    client_host = request.client.host if request.client else "unknown"
+    digest = hashlib.sha256(f"{scope}:{client_host}:{subject.casefold()}".encode()).hexdigest()
+    now = int(time.time())
+    window_start = (now // window_seconds) * window_seconds
+    table = ApiRateLimitBucket.__table__
+    dialect = db.get_bind().dialect.name
+    insert_statement = (
+        postgresql_insert(table) if dialect == "postgresql" else sqlite_insert(table)
+    )
+    statement = insert_statement.values(
+        bucket_key=digest,
+        window_start=window_start,
+        request_count=1,
+    ).on_conflict_do_update(
+        index_elements=[table.c.bucket_key],
+        set_={
+            "window_start": window_start,
+            "request_count": case(
+                (table.c.window_start == window_start, table.c.request_count + 1),
+                else_=1,
+            ),
+        },
+    ).returning(table.c.request_count)
+    count = db.scalar(statement)
+    db.execute(delete(table).where(table.c.window_start < now - 86400))
+    db.commit()
+    if count is not None and count > limit:
+        retry_after = window_start + window_seconds - now
+        raise HTTPException(
+            status_code=429,
+            detail="Too many authentication requests. Please try again later.",
+            headers={"Retry-After": str(max(1, retry_after))},
+        )
+
+
+def limit_login_attempts(
+    request: Request, db: DatabaseSession
+) -> None:
+    """Limit credential attempts per client address across API instances."""
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="login",
+        subject="credentials",
+        limit=10,
+        window_seconds=900,
+    )
+
+
+def limit_registration_attempts(
+    request: Request, db: DatabaseSession
+) -> None:
+    """Limit account creation attempts per client address across API instances."""
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="registration",
+        subject="accounts",
+        limit=5,
+        window_seconds=3600,
+    )

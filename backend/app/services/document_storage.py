@@ -134,6 +134,7 @@ async def store_upload(
         object_id = uuid4().hex
         storage_key = f"{object_id[:2]}/{object_id}{extension}"
         persist_file(temporary_path, storage_key)
+        temporary_path.unlink(missing_ok=True)
         temporary_path = None
         return StoredUpload(
             storage_key=storage_key,

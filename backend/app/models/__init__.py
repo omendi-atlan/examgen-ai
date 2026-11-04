@@ -15,6 +15,7 @@ from app.models.academic import (
     Topic,
 )
 from app.models.identity import (
+    ApiRateLimitBucket,
     AuditEvent,
     MembershipRole,
     MembershipStatus,
@@ -25,6 +26,7 @@ from app.models.identity import (
 
 __all__ = [
     "AcademicDocument",
+    "ApiRateLimitBucket",
     "AuditEvent",
     "ClassificationMethod",
     "DocumentExtraction",

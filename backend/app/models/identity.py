@@ -6,9 +6,11 @@ from enum import StrEnum
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     UniqueConstraint,
     Uuid,
@@ -143,3 +145,13 @@ class AuditEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ApiRateLimitBucket(Base):
+    """Shared fixed-window counters for authentication abuse protection."""
+
+    __tablename__ = "api_rate_limit_buckets"
+
+    bucket_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_start: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False)

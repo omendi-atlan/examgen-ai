@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, limit_login_attempts, limit_registration_attempts
 from app.core.database import get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import User
@@ -23,6 +23,7 @@ AuthenticatedUser = Annotated[User, Depends(get_current_user)]
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_registration_attempts)],
 )
 def register(payload: RegisterRequest, db: DatabaseSession) -> User:
     """Create a user account; passwords are never stored or returned in plaintext."""
@@ -49,7 +50,11 @@ def register(payload: RegisterRequest, db: DatabaseSession) -> User:
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    dependencies=[Depends(limit_login_attempts)],
+)
 def login(payload: LoginRequest, db: DatabaseSession) -> TokenResponse:
     """Authenticate credentials and return a short-lived signed access token."""
     user = db.scalar(select(User).where(User.email == payload.email))

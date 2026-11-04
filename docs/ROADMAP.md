@@ -19,7 +19,11 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Add canonical user, workspace, membership and audit-event models.
 - [x] Add the reviewed identity and audit migration.
 - [x] Add registration, login, short-lived signed access tokens and workspace membership enforcement.
-- [ ] Complete PostgreSQL integration, tenant-isolation, rate-limiting and security tests.
+- [x] Add shared PostgreSQL-backed login and registration rate limiting with 429/Retry-After responses and concurrent atomicity tests.
+- [x] Add role-based ingestion authorization, cross-workspace taxonomy isolation and fail-closed production configuration tests.
+- [x] Add PostgreSQL-backed cross-tenant document access, taxonomy isolation and role-authorization integration tests.
+- [ ] Complete the full route-by-route PostgreSQL authorization matrix and production ingress/edge rate-limit verification.
+- [ ] Complete representative document-load and OCR-heavy corpus throughput qualification.
 - [ ] Add server-side examination and attempt models with immutable versions.
 
 ### Phase 2 — Academic ingestion and subject intelligence (implementation in progress)
@@ -40,7 +44,9 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Persist extraction quality signals; extraction is never automatically approved.
 - [x] Enforce PDF page, OCR pixel/time, presentation slide, Office archive expansion/ratio and extracted-character limits.
 - [x] Add expiring worker leases, attempt accounting, expired-job recovery and fencing tokens to prevent stale workers committing results.
-- [ ] Add source-citation acceptance tests, broader tenant-isolation/authorization/rate-limit tests and representative document-load/OCR throughput tests.
+- [x] Add source-addressable segment locator and immutable-version provenance acceptance coverage.
+- [x] Add concurrent extraction stress coverage for four 256 KB academic text sources and explicit PowerPoint slide/shape citation locators.
+- [ ] Complete realistic multi-megabyte PDF and OCR-heavy scan throughput tests with multiple worker replicas.
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
 - Blueprint constraints, question lifecycle, provenance, deduplication, model answers and rubrics.
@@ -67,3 +73,5 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 ## Release gates
 
 Every phase requires automated tests, documented acceptance criteria, security review appropriate to the change and human review of academic moderation policies. Do not mark a roadmap item complete until code, tests and operational documentation demonstrate it. Uploaded academic files are untrusted input; extracted text must retain provenance and must never be treated as executable instructions. Do not expose formal answer keys or unreleased rubrics to the browser.
+
+See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICATION.md) for release gates and deployment caveats.
