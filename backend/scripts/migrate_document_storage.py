@@ -6,6 +6,7 @@ provenance, or storage keys. Local copies are retained unless --delete-local
 is explicitly supplied after a successful verified upload.
 """
 import argparse
+import hashlib
 from pathlib import Path
 
 from sqlalchemy import select
@@ -29,6 +30,12 @@ def migrate(*, delete_local: bool = False) -> tuple[int, int]:
             local_path = resolve_storage_path(Path(settings.document_storage_path), version.storage_key)
             if not local_path.is_file():
                 raise FileNotFoundError(f"Local source object is missing for version {version.id}.")
+            digest = hashlib.sha256()
+            with local_path.open("rb") as source:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            if digest.hexdigest() != version.sha256 or local_path.stat().st_size != version.size_bytes:
+                raise ValueError(f"Local source integrity check failed for version {version.id}.")
             persist_file(local_path, version.storage_key)
             copied += 1
             if delete_local:
