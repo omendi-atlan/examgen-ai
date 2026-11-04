@@ -6,6 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /srv/examgen
 COPY pyproject.toml ./
+COPY alembic.ini ./
 COPY backend ./backend
 RUN python -m pip install --upgrade pip && python -m pip install .
 
