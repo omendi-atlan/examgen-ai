@@ -10,6 +10,10 @@
 - The browser never receives object-store credentials or object URLs. Downloads are performed by the server-side worker.
 - Worker reads verify the stored object's byte length and SHA-256 against the immutable `document_versions` row before extraction.
 
+## Local MinIO development profile
+
+For a persistent local S3-compatible target, see [MinIO development setup](MINIO_SETUP.md). The Compose profile is opt-in and binds the S3 API and console to loopback only. It is for development and integration testing, not a highly available production deployment.
+
 ## Local-to-managed migration
 
 1. Back up PostgreSQL and the private document volume.
@@ -42,3 +46,8 @@ Set `DOCUMENT_STORAGE_BACKEND=local` for both API and worker and restore the ori
 - Enable bucket versioning and provider-side access logging according to the deployment's retention policy.
 - Alert on object upload, head, download, integrity and delete failures.
 - Do not make the bucket public or generate browser-facing presigned URLs for source materials.
+
+
+## Integration note
+
+This MinIO development profile is stacked after the student coursework resource API in PR #24. It is for local development and does not replace the separate live staging-provider qualification gate.

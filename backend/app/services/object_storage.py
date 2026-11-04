@@ -61,14 +61,14 @@ def persist_file(source: Path, storage_key: str) -> None:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest_state.update(chunk)
     digest = digest_state.hexdigest()
+    extra_args: dict[str, object] = {"Metadata": {"sha256": digest}}
+    if settings.object_storage_server_side_encryption:
+        extra_args["ServerSideEncryption"] = settings.object_storage_server_side_encryption
     client.upload_file(
         str(source),
         settings.object_storage_bucket,
         key,
-        ExtraArgs={
-            "ServerSideEncryption": "AES256",
-            "Metadata": {"sha256": digest},
-        },
+        ExtraArgs=extra_args,
     )
     head = client.head_object(Bucket=settings.object_storage_bucket, Key=key)
     if head.get("ContentLength") != source.stat().st_size or head.get("Metadata", {}).get("sha256") != digest:
