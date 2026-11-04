@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
-from app.api.dependencies import enforce_auth_rate_limit
-from app.core.database import Base
+from app.api.dependencies import enforce_auth_rate_limit, get_db
+from app.core.config import get_settings\nfrom app.core.database import Base\nfrom app.main import app\nfrom app.services import document_storage
 from app.models import (
     AcademicDocument,
     DocumentProcessingJob,
@@ -18,9 +18,9 @@ from app.models import (
 )
 from app.services import document_processing
 from app.services.document_processing import claim_next_job, recover_expired_jobs
-from fastapi import HTTPException
+from fastapi import HTTPException\nfrom fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from starlette.requests import Request
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -202,3 +202,114 @@ def test_postgres_rate_limit_counter_is_atomic_across_concurrent_requests(
 
     assert sum(outcomes) == 5
     assert outcomes.count(False) == 15
+
+
+def test_postgres_tenant_isolation_and_role_authorization(
+    postgres_sessions, monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    engine = postgres_sessions.kw["bind"]
+    settings = get_settings()
+    previous_storage_path = settings.document_storage_path
+    settings.document_storage_path = str(tmp_path / "private-sources")
+
+    def override_get_db():
+        with postgres_sessions() as session:
+            yield session
+
+    monkeypatch.setattr(
+        document_storage,
+        "scan_file",
+        lambda _path: {"enabled": True, "status": "clean"},
+    )
+    app.dependency_overrides[get_db] = override_get_db
+
+    def register_and_login(client: TestClient, email: str) -> str:
+        registered = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": email,
+                "display_name": "PostgreSQL tenant test",
+                "password": "Correct-Horse-Battery-9!",
+            },
+        )
+        assert registered.status_code == 201
+        logged_in = client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "Correct-Horse-Battery-9!"},
+        )
+        assert logged_in.status_code == 200
+        return logged_in.json()["access_token"]
+
+    try:
+        with TestClient(app) as client:
+            owner_token = register_and_login(client, f"{uuid4()}@example.test")
+            outsider_token = register_and_login(client, f"{uuid4()}@example.test")
+            owner_headers = {"Authorization": f"Bearer {owner_token}"}
+            outsider_headers = {"Authorization": f"Bearer {outsider_token}"}
+
+            owner_workspace = client.post(
+                "/api/v1/workspaces",
+                headers=owner_headers,
+                json={"name": "Owner tenant", "slug": f"owner-{uuid4().hex[:12]}"},
+            ).json()["id"]
+            outsider_workspace = client.post(
+                "/api/v1/workspaces",
+                headers=outsider_headers,
+                json={"name": "Outsider tenant", "slug": f"outsider-{uuid4().hex[:12]}"},
+            ).json()["id"]
+
+            uploaded = client.post(
+                f"/api/v1/workspaces/{owner_workspace}/documents",
+                headers=owner_headers,
+                data={"title": "PostgreSQL isolated source"},
+                files={"file": ("source.txt", b"Private source for tenant qualification", "text/plain")},
+            )
+            assert uploaded.status_code == 201
+            document_id = uploaded.json()["id"]
+            version_id = uploaded.json()["versions"][0]["id"]
+
+            hidden = client.get(
+                f"/api/v1/workspaces/{owner_workspace}/documents/{document_id}",
+                headers=outsider_headers,
+            )
+            assert hidden.status_code == 404
+
+            foreign_subject = client.post(
+                f"/api/v1/workspaces/{outsider_workspace}/taxonomy/subjects",
+                headers=outsider_headers,
+                json={"name": "Foreign subject"},
+            )
+            foreign_topic = client.post(
+                f"/api/v1/workspaces/{outsider_workspace}/taxonomy/subjects/{foreign_subject.json()['id']}/topics",
+                headers=outsider_headers,
+                json={"name": "Foreign topic"},
+            )
+            cross_tenant_classification = client.put(
+                f"/api/v1/workspaces/{owner_workspace}/documents/{document_id}"
+                f"/versions/{version_id}/classifications",
+                headers=owner_headers,
+                json={
+                    "topic_ids": [foreign_topic.json()["id"]],
+                    "rationale": "Must not cross workspace boundaries.",
+                },
+            )
+            assert cross_tenant_classification.status_code == 422
+
+            with Session(engine) as db:
+                owner_membership = db.scalar(
+                    select(WorkspaceMembership).where(
+                        WorkspaceMembership.workspace_id == UUID(owner_workspace)
+                    )
+                )
+                assert owner_membership is not None
+                owner_membership.role = MembershipRole.STUDENT
+                db.commit()
+
+            student_forbidden = client.get(
+                f"/api/v1/workspaces/{owner_workspace}/documents",
+                headers=owner_headers,
+            )
+            assert student_forbidden.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        settings.document_storage_path = previous_storage_path
