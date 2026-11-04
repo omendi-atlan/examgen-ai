@@ -143,6 +143,48 @@ export default function CourseworkResourcesPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not load extracted text."); }
   }
 
+
+  async function downloadVersion(resource: Resource, version: Version) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(
+        `${base}/api/v1/workspaces/${workspaceId}/subjects/${subjectId}/resources/${resource.id}/versions/${version.id}/download`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) {
+        const body = await response.json() as { detail?: string };
+        throw new Error(body.detail ?? "Download could not be completed.");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = version.original_filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+      setNotice("Your authorised source download has started.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Download failed.");
+    } finally { setBusy(false); }
+  }
+
+  async function retryExtraction(resource: Resource, version: Version) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const updated = await api<Resource>(
+        `/workspaces/${workspaceId}/subjects/${subjectId}/resources/${resource.id}/versions/${version.id}/retry`,
+        { method: "POST" },
+      );
+      setResources((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setSegments([]);
+      setNotice("Extraction has been safely requeued. Refresh to follow processing progress.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not retry extraction.");
+    } finally { setBusy(false); }
+  }
+
   async function appendVersion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const selected = resources.find((item) => item.id === selectedId);
@@ -205,8 +247,8 @@ export default function CourseworkResourcesPage() {
             <form onSubmit={uploadResource}>
               <label style={{ display: "block", fontSize: 13 }}>Resource title<input required maxLength={240} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Week 4 — Database normalisation" style={field} /></label>
               <label style={{ display: "block", fontSize: 13, marginTop: 12 }}>Visibility<select value={visibility} onChange={(event) => setVisibility(event.target.value as "private" | "cohort")} style={field}><option value="private">Private — only me</option>{currentSubject?.resource_sharing_enabled && <option value="cohort">Share with enrolled cohort</option>}</select></label>
-              <label style={{ display: "block", fontSize: 13, marginTop: 12 }}>Upload or scan<input required type="file" accept=".pdf,.docx,.pptx,.txt,.md,application/pdf" capture="environment" onChange={(event) => setFile(event.target.files?.[0] ?? null)} style={{ ...field, padding: 8 }} /></label>
-              <p style={{ color: "#8793a5", fontSize: 11, lineHeight: 1.5 }}>On supported mobile devices, Scan may open the camera. Image-only PDFs are sent through OCR when available. Private is the default.</p>
+              <label style={{ display: "block", fontSize: 13, marginTop: 12 }}>Upload or scan<input required type="file" accept=".pdf,.docx,.pptx,.txt,.md,application/pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} style={{ ...field, padding: 8 }} /></label>
+              <p style={{ color: "#8793a5", fontSize: 11, lineHeight: 1.5 }}>Upload PDF, DOCX, PPTX, TXT or Markdown resources. Image-only PDFs are sent through OCR when available. Private is the default; camera scanning is not yet supported as a standalone workflow.</p>
               <button type="submit" disabled={busy || !file || !title.trim()} style={{ ...action, width: "100%" }}>{busy ? "Uploading…" : "Upload to this subject"}</button>
             </form>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginTop: 24 }}><h3 style={{ fontSize: 15, margin: 0 }}>Resources ({resources.length})</h3><button onClick={() => void refreshResources()} disabled={busy} style={{ ...action, padding: "7px 10px", fontSize: 12 }}>Refresh</button></div>
@@ -228,6 +270,10 @@ export default function CourseworkResourcesPage() {
               <p style={{ color: "#9aa5b5", fontSize: 12 }}>{latest?.original_filename} · Version {latest?.version_number} · <strong style={{ color: "#55d5e8" }}>{(latest?.extraction?.status ?? "pending").replaceAll("_", " ")}</strong></p>
               {latest?.extraction?.error_message && <p role="alert" style={{ color: "#ffb18b" }}>Processing issue: {latest.extraction.error_message}</p>}
               <p style={{ color: "#9aa5b5", fontSize: 12 }}>{latest?.extraction?.character_count ?? 0} characters · {latest?.extraction?.segment_count ?? 0} segments</p>
+              {latest && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "12px 0" }}>
+                <button type="button" disabled={busy} onClick={() => void downloadVersion(selected, latest)} style={{ ...action, background: "#293242", color: "#f4f6fa" }}>Download original</button>
+                {latest.extraction?.status === "failed" && <button type="button" disabled={busy} onClick={() => void retryExtraction(selected, latest)} style={action}>Retry extraction</button>}
+              </div>}
               <form onSubmit={appendVersion} style={{ borderTop: "1px solid #293242", paddingTop: 14, marginTop: 15 }}>
                 <label style={{ display: "block", fontSize: 13 }}>Append a revised version<input type="file" required accept=".pdf,.docx,.pptx,.txt,.md" onChange={(event) => setVersionFile(event.target.files?.[0] ?? null)} style={{ ...field, padding: 8 }} /></label>
                 <button type="submit" disabled={busy || !versionFile} style={{ ...action, marginTop: 10 }}>Add new version</button>
