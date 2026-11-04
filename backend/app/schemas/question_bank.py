@@ -276,3 +276,17 @@ class QuestionGenerationResponse(BaseModel):
     generated_count: int
     total_marks: int
     questions: list[QuestionResponse]
+
+
+class ApprovedBlueprintResponse(BaseModel):
+    blueprint_id: UUID
+    blueprint_version_id: UUID
+    subject_id: UUID
+    title: str
+    duration_minutes: int
+    total_marks: int
+    question_count: int
+    cognitive_distribution: dict[str, int]
+    difficulty_distribution: dict[str, int]
+    question_type_distribution: dict[str, int]
+    approved_at: datetime | None
