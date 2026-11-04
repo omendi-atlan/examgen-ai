@@ -31,9 +31,19 @@ from app.models.identity import (
     Workspace,
     WorkspaceMembership,
 )
+from app.models.question_bank import (
+    Question,
+    QuestionSourceCitation,
+    QuestionVersion,
+    QuestionVersionStatus,
+)
 
 __all__ = [
     "AcademicDocument",
+    "Question",
+    "QuestionSourceCitation",
+    "QuestionVersion",
+    "QuestionVersionStatus",
     "BlueprintOutcomeWeight",
     "BlueprintTopicWeight",
     "BlueprintVersionStatus",
