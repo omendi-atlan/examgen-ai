@@ -198,12 +198,14 @@ export default function PracticeExamsPage() {
   async function submitAttempt() {
     if (!activeAttempt) return;
     setBusy(true); setError("");
+    const pendingAnswers = [...dirty];
+    setDirty([]);
     try {
       // Flush all pending answers before final submission.
-      for (const questionId of dirty) {
+      for (const questionId of pendingAnswers) {
         await api(
           `/workspaces/${workspaceId}/subjects/${subjectId}/practice-attempts/${activeAttempt.id}/responses/${questionId}`,
-          { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ response: responsesRef.current[questionId] ?? {} }) },
+          { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ response: responses[questionId] ?? {} }) },
         );
       }
       const result = await api<Attempt>(
@@ -243,7 +245,7 @@ export default function PracticeExamsPage() {
       ))}</div>;
     }
     if (question.question_type === "numeric") {
-      return <label style={{ display: "block", marginTop: 12, fontSize: 13 }}>Your numeric answer<input type="number" disabled={disabled} value={typeof response.value === "number" ? response.value : ""} onChange={(event) => updateResponse(question.exam_question_id, { value: event.target.value === "" ? "" : Number(event.target.value) })} style={field} /></label>;
+      return <label style={{ display: "block", marginTop: 12, fontSize: 13 }}>Your numeric answer<input type="number" disabled={disabled} value={typeof response.value === "number" ? response.value : ""} onChange={(event) => updateResponse(question.exam_question_id, event.target.value === "" ? {} : { value: Number(event.target.value) })} style={field} /></label>;
     }
     if (question.question_type === "fill_blank") {
       return <label style={{ display: "block", marginTop: 12, fontSize: 13 }}>Your answer<input disabled={disabled} value={typeof response.text === "string" ? response.text : ""} onChange={(event) => updateResponse(question.exam_question_id, { text: event.target.value })} style={field} /></label>;
