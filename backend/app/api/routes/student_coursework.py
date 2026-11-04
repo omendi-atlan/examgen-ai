@@ -23,6 +23,7 @@ from app.api.routes.academic import _document_response, _ingest_version, _load_d
 from app.core.database import get_db
 from app.models import (
     AcademicDocument,
+    DocumentExtraction,
     DocumentTextSegment,
     DocumentVersion,
     MembershipRole,
@@ -278,8 +279,8 @@ def get_coursework_resource_segments(
     _visible_document(db, workspace_id, subject_id, document_id, membership.user_id)
     segments = db.scalars(
         select(DocumentTextSegment)
-        .join(DocumentTextSegment.extraction)
-        .join(DocumentTextSegment.extraction.property.mapper.class_.version)
+        .join(DocumentExtraction, DocumentTextSegment.extraction_id == DocumentExtraction.id)
+        .join(DocumentVersion, DocumentVersion.id == DocumentExtraction.version_id)
         .where(
             DocumentVersion.id == version_id,
             DocumentVersion.document_id == document_id,
