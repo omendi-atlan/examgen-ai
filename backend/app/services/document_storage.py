@@ -133,8 +133,6 @@ async def store_upload(
 
         object_id = uuid4().hex
         storage_key = f"{object_id[:2]}/{object_id}{extension}"
-        from app.services.object_storage import persist_file
-
         persist_file(temporary_path, storage_key)
         temporary_path = None
         return StoredUpload(
