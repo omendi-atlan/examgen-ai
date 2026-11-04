@@ -136,3 +136,31 @@ def enforce_auth_rate_limit(
             detail="Too many authentication requests. Please try again later.",
             headers={"Retry-After": str(max(1, retry_after))},
         )
+
+
+def limit_login_attempts(
+    request: Request, db: DatabaseSession
+) -> None:
+    """Limit credential attempts per client address across API instances."""
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="login",
+        subject="credentials",
+        limit=10,
+        window_seconds=900,
+    )
+
+
+def limit_registration_attempts(
+    request: Request, db: DatabaseSession
+) -> None:
+    """Limit account creation attempts per client address across API instances."""
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="registration",
+        subject="accounts",
+        limit=5,
+        window_seconds=3600,
+    )
