@@ -17,23 +17,6 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models import (
-from collections.abc import Callable
-import hashlib
-import time
-from typing import Annotated
-from uuid import UUID
-
-import jwt
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import case, delete, select
-from sqlalchemy.dialects.postgresql import insert as postgresql_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.orm import Session
-
-from app.core.database import get_db
-from app.core.security import decode_access_token
-from app.models import (
     ApiRateLimitBucket,
     MembershipRole,
     MembershipStatus,
