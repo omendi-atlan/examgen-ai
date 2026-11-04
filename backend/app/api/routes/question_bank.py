@@ -15,8 +15,6 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import (
     AcademicDocument,
-    BlueprintOutcomeWeight,
-    BlueprintTopicWeight,
     BlueprintVersionStatus,
     DocumentExtraction,
     DocumentExtractionReview,
@@ -160,7 +158,7 @@ def _public_question(question: Question) -> QuestionResponse:
         current_version_number=question.current_version_number,
         created_at=question.created_at,
         updated_at=question.updated_at,
-        versions=[_public_version(item) for item in question.versions],
+        versions=[_public_version(_current_version(question))],
     )
 
 
@@ -620,6 +618,7 @@ async def generate_blueprint_questions(
     source_segments: list[dict[str, str]] = []
     segment_map: dict[UUID, tuple[DocumentTextSegment, DocumentVersion]] = {}
     total_characters = 0
+    segment_count = 0
     for source_version_id in payload.source_version_ids:
         version = db.scalar(
             select(DocumentVersion)
@@ -663,6 +662,9 @@ async def generate_blueprint_questions(
         if not segments:
             raise HTTPException(status_code=409, detail="A selected source has no extracted text segments.")
         for segment in segments:
+            segment_count += 1
+            if segment_count > 200:
+                raise HTTPException(status_code=413, detail="Selected sources contain too many extracted segments.")
             total_characters += len(segment.text)
             if total_characters > 100_000:
                 raise HTTPException(status_code=413, detail="Selected source material exceeds the generation limit.")
