@@ -83,6 +83,7 @@ class QuestionContentInput(BaseModel):
                 if (
                     not isinstance(correct, list)
                     or not correct
+                    or not all(isinstance(item, str) for item in correct)
                     or len(correct) != len(set(correct))
                     or not set(correct).issubset(option_ids)
                 ):
@@ -118,7 +119,10 @@ class QuestionContentInput(BaseModel):
             criterion_marks = [
                 item.get("marks")
                 for item in criteria
-                if isinstance(item, dict) and isinstance(item.get("marks"), int)
+                if isinstance(item, dict)
+                and isinstance(item.get("marks"), int)
+                and not isinstance(item.get("marks"), bool)
+                and item.get("marks") > 0
             ]
             if len(criterion_marks) != len(criteria) or sum(criterion_marks) != self.marks:
                 raise ValueError("Rubric criterion marks must sum exactly to the question marks.")
@@ -128,20 +132,50 @@ class QuestionContentInput(BaseModel):
             matches = answer.get("matches")
             if not isinstance(left_items, list) or not isinstance(right_items, list) or not isinstance(matches, list):
                 raise ValueError("Matching questions require left/right items and keyed matches.")
-            left_ids = {item.get("id") for item in left_items if isinstance(item, dict)}
-            right_ids = {item.get("id") for item in right_items if isinstance(item, dict)}
-            if not left_ids or not right_ids or any(
-                not isinstance(pair, dict)
-                or pair.get("left_id") not in left_ids
-                or pair.get("right_id") not in right_ids
-                for pair in matches
+            left_ids = {
+                item.get("id")
+                for item in left_items
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            }
+            right_ids = {
+                item.get("id")
+                for item in right_items
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            }
+            if (
+                not left_ids
+                or not right_ids
+                or len(left_ids) != len(left_items)
+                or len(right_ids) != len(right_items)
+                or len(matches) != len(left_ids)
+                or any(
+                    not isinstance(pair, dict)
+                    or pair.get("left_id") not in left_ids
+                    or pair.get("right_id") not in right_ids
+                    for pair in matches
+                )
             ):
                 raise ValueError("Matching answer keys must reference valid left and right item ids.")
         elif self.question_type == "ordering":
             items = schema.get("items")
             ordered_ids = answer.get("ordered_ids")
-            item_ids = {item.get("id") for item in items if isinstance(item, dict)} if isinstance(items, list) else set()
-            if not item_ids or not isinstance(ordered_ids, list) or set(ordered_ids) != item_ids or len(ordered_ids) != len(item_ids):
+            item_ids = (
+                {
+                    item.get("id")
+                    for item in items
+                    if isinstance(item, dict) and isinstance(item.get("id"), str)
+                }
+                if isinstance(items, list)
+                else set()
+            )
+            if (
+                not item_ids
+                or len(item_ids) != len(items)
+                or not isinstance(ordered_ids, list)
+                or not all(isinstance(item, str) for item in ordered_ids)
+                or set(ordered_ids) != item_ids
+                or len(ordered_ids) != len(item_ids)
+            ):
                 raise ValueError("Ordering answer keys must contain every item id exactly once.")
         if self.question_type in {"diagram_interpretation", "diagram_construction"}:
             visual = self.visual_requirement
