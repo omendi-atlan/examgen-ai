@@ -348,3 +348,64 @@ def test_extraction_review_is_workspace_isolated(client: TestClient) -> None:
         headers={"Authorization": f"Bearer {outsider_token}"},
     )
     assert denied.status_code == 404
+
+
+def test_student_role_cannot_access_examiner_ingestion_endpoints(client: TestClient) -> None:
+    from app.models import MembershipRole, WorkspaceMembership
+
+    token, workspace_id = create_workspace(client, "student-role@example.test")
+    created = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"title": "Restricted source"},
+        files={"file": ("restricted.txt", b"Examiner-only academic source", "text/plain")},
+    )
+    assert created.status_code == 201
+
+    with Session(app.state.test_engine) as db:
+        membership = db.scalar(
+            select(WorkspaceMembership).where(
+                WorkspaceMembership.workspace_id == UUID(workspace_id)
+            )
+        )
+        assert membership is not None
+        membership.role = MembershipRole.STUDENT
+        db.commit()
+
+    response = client.get(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_classification_rejects_topic_from_another_workspace(client: TestClient) -> None:
+    owner_token, owner_workspace = create_workspace(client, "taxonomy-owner@example.test")
+    source = client.post(
+        f"/api/v1/workspaces/{owner_workspace}/documents",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        data={"title": "Owner source"},
+        files={"file": ("owner.txt", b"Owner workspace source", "text/plain")},
+    )
+    document_id = source.json()["id"]
+    version_id = source.json()["versions"][0]["id"]
+
+    other_token, other_workspace = create_workspace(client, "taxonomy-other@example.test")
+    subject = client.post(
+        f"/api/v1/workspaces/{other_workspace}/taxonomy/subjects",
+        headers={"Authorization": f"Bearer {other_token}"},
+        json={"name": "Other workspace subject"},
+    )
+    topic = client.post(
+        f"/api/v1/workspaces/{other_workspace}/taxonomy/subjects/{subject.json()['id']}/topics",
+        headers={"Authorization": f"Bearer {other_token}"},
+        json={"name": "Private topic"},
+    )
+
+    rejected = client.put(
+        f"/api/v1/workspaces/{owner_workspace}/documents/{document_id}"
+        f"/versions/{version_id}/classifications",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"topic_ids": [topic.json()["id"]], "rationale": "Attempted cross-tenant assignment."},
+    )
+    assert rejected.status_code == 422
