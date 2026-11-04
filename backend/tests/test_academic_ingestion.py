@@ -1,7 +1,6 @@
 """Academic ingestion, provenance, extraction and taxonomy API tests."""
 
 import pytest
-
 from app.core.config import get_settings
 from app.core.database import Base, get_db
 from app.main import app
