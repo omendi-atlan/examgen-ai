@@ -1,13 +1,12 @@
 """Persistence constraints for canonical workspace identity records."""
 
 import pytest
+from app.core.database import Base
+from app.models import MembershipRole, MembershipStatus, User, Workspace, WorkspaceMembership
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
-
-from app.core.database import Base
-from app.models import MembershipRole, MembershipStatus, User, Workspace, WorkspaceMembership
 
 
 def test_workspace_membership_is_unique_and_identity_keys_are_normalized() -> None:
