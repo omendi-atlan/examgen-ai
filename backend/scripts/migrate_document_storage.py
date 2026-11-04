@@ -29,7 +29,14 @@ def migrate(*, delete_local: bool = False) -> tuple[int, int]:
         for version in versions:
             local_path = resolve_storage_path(Path(settings.document_storage_path), version.storage_key)
             if not local_path.is_file():
-                raise FileNotFoundError(f"Local source object is missing for version {version.id}.")
+                with open_storage_file(
+                    version.storage_key,
+                    expected_size=version.size_bytes,
+                    expected_sha256=version.sha256,
+                ):
+                    pass
+                skipped += 1
+                continue
             digest = hashlib.sha256()
             with local_path.open("rb") as source:
                 for chunk in iter(lambda: source.read(1024 * 1024), b""):
