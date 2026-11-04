@@ -830,7 +830,7 @@ def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled
 
 
 def test_coursework_download_is_object_authorised_and_checksum_verified(client: TestClient) -> None:
-    from app.models import MembershipRole, WorkspaceMembership
+    from app.models import MembershipRole, MembershipStatus, User, WorkspaceMembership
 
     token, workspace_id = create_workspace(client, "coursework-download-owner@example.test")
     headers = {"Authorization": f"Bearer {token}"}
