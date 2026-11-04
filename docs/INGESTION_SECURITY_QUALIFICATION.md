@@ -25,7 +25,8 @@ The test suite verifies that:
 - A document cannot be accessed across workspace boundaries.
 - A taxonomy topic from another workspace cannot be assigned to a document.
 - Extraction review history is workspace-isolated and decisions are append-only.
-- A route-wide matrix exercises all academic upload, version, document, segment, taxonomy, classification and extraction-review endpoints: non-editor members receive 403, while non-members receive a non-disclosing 404 for cross-workspace requests.
+- A route-wide SQLite API matrix exercises all academic upload, version, document, segment, taxonomy, classification and extraction-review endpoints: non-editor members receive 403, while non-members receive a non-disclosing 404 for cross-workspace requests.
+- A dedicated PostgreSQL integration test verifies route-level 403 role enforcement and 404 cross-tenant isolation for document, taxonomy, segment, classification and extraction-review access.
 
 ## Provenance and citation qualification
 
