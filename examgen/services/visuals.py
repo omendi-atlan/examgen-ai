@@ -123,12 +123,13 @@ def _box(x: float, y: float, w: float, h: float, text: str, fill: str,
     tspans = "".join(
         f'<tspan x="{x + w / 2}" y="{start_y + i * (font_size + 2)}">{_esc(line)}</tspan>'
         for i, line in enumerate(lines))
+    weight = ' font-weight="600"' if bold else ""
     return (
         f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{radius}" fill="{fill}" '
         f'stroke="{stroke}" stroke-width="1.5"/>'
         f'<text x="{x + w / 2}" y="{start_y}" text-anchor="middle" '
         f'font-size="{font_size}" fill="{text_color}"'
-        f'{" font-weight=\"600\"" if bold else ""}>{tspans}</text>'
+        f'{weight}>{tspans}</text>'
     )
 
 
