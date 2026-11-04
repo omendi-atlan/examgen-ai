@@ -5,10 +5,12 @@ extraction queue, storage, provenance and audit services. It does not create a
 second document store or expose examiner governance operations to students.
 """
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Iterator
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
@@ -23,7 +25,10 @@ from app.core.database import get_db
 from app.models import (
     AcademicDocument,
     DocumentExtraction,
+    DocumentProcessingJob,
     DocumentTextSegment,
+    ExtractionJobStatus,
+    ExtractionStatus,
     DocumentVersion,
     MembershipRole,
     Subject,
@@ -31,6 +36,7 @@ from app.models import (
 )
 from app.schemas.academic import DocumentResponse, SubjectResponse, TextSegmentResponse
 from app.services.audit import record_audit_event
+from app.services.object_storage import open_storage_file
 
 router = APIRouter(tags=["student-coursework-resources"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
@@ -326,3 +332,138 @@ def get_coursework_resource_segments(
         )
         for item in segments
     ]
+
+
+
+@router.get(
+    "/workspaces/{workspace_id}/subjects/{subject_id}/resources/{document_id}/versions/{version_id}/download",
+)
+def download_coursework_resource(
+    workspace_id: UUID,
+    subject_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+    db: DatabaseSession,
+    membership: ActiveMember,
+) -> StreamingResponse:
+    """Stream an authorised immutable source version without exposing storage keys."""
+    _visible_document(db, workspace_id, subject_id, document_id, membership.user_id)
+    version = db.scalar(
+        select(DocumentVersion).where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+        )
+    )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Coursework resource version not found.")
+
+    def stream_file() -> Iterator[bytes]:
+        with open_storage_file(
+            version.storage_key,
+            expected_size=version.size_bytes,
+            expected_sha256=version.sha256,
+        ) as local_path:
+            with local_path.open("rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    yield chunk
+
+    filename = version.original_filename.replace("\\", "_").replace('"', "_").replace("\r", "_").replace("\n", "_")
+    disposition = f"attachment; filename*=UTF-8''{quote(filename)}"
+    return StreamingResponse(
+        stream_file(),
+        media_type=version.media_type,
+        headers={
+            "Content-Disposition": disposition,
+            "Content-Length": str(version.size_bytes),
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.post(
+    "/workspaces/{workspace_id}/subjects/{subject_id}/resources/{document_id}/versions/{version_id}/retry",
+    response_model=DocumentResponse,
+)
+def retry_coursework_resource_extraction(
+    workspace_id: UUID,
+    subject_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+    db: DatabaseSession,
+    membership: ActiveMember,
+) -> DocumentResponse:
+    """Allow the source owner to explicitly requeue a terminally failed extraction."""
+    document = db.scalar(
+        select(AcademicDocument).where(
+            AcademicDocument.id == document_id,
+            AcademicDocument.workspace_id == workspace_id,
+            AcademicDocument.subject_id == subject_id,
+            AcademicDocument.created_by == membership.user_id,
+        )
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Coursework resource not found.")
+
+    version = db.scalar(
+        select(DocumentVersion)
+        .where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+        )
+        .with_for_update()
+    )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Coursework resource version not found.")
+
+    job = db.scalar(
+        select(DocumentProcessingJob)
+        .where(DocumentProcessingJob.version_id == version_id)
+        .with_for_update()
+    )
+    extraction = db.scalar(
+        select(DocumentExtraction)
+        .where(DocumentExtraction.version_id == version_id)
+        .with_for_update()
+    )
+    if job is None or extraction is None:
+        raise HTTPException(status_code=409, detail="This resource has no retryable extraction job.")
+    if job.status != ExtractionJobStatus.FAILED or extraction.status != ExtractionStatus.FAILED:
+        raise HTTPException(status_code=409, detail="Only a failed extraction can be retried.")
+    if job.lease_token is not None:
+        raise HTTPException(status_code=409, detail="The extraction is still leased to a worker.")
+
+    job.status = ExtractionJobStatus.QUEUED
+    job.attempts = 0
+    job.error_message = None
+    job.started_at = None
+    job.lease_expires_at = None
+    job.lease_token = None
+    job.finished_at = None
+    extraction.status = ExtractionStatus.QUEUED
+    extraction.error_message = None
+    extraction.parser_name = "pending"
+    extraction.parser_version = "0"
+    extraction.character_count = 0
+    extraction.page_count = None
+    extraction.extraction_metadata = {"processing": "manually_requeued"}
+    extraction.quality_report = {
+        "outcome": "queued",
+        "character_count": 0,
+        "segment_count": 0,
+        "page_count": None,
+        "reasons": ["The student requested a new extraction attempt."],
+        "automatically_approved": False,
+    }
+    extraction.segments.clear()
+    record_audit_event(
+        db,
+        action="coursework.resource_extraction_retried",
+        resource_type="academic_document_version",
+        resource_id=str(version.id),
+        actor_user_id=membership.user_id,
+        workspace_id=workspace_id,
+        event_data={"document_id": str(document.id), "version_id": str(version.id)},
+    )
+    db.commit()
+    return _document_response(_load_document(db, workspace_id, document.id))
