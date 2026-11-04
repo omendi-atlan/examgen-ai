@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     object_storage_endpoint_url: str | None = None
     object_storage_access_key: SecretStr | None = None
     object_storage_secret_key: SecretStr | None = None
+    object_storage_server_side_encryption: str = "AES256"
     max_document_upload_bytes: int = 20000000
     cors_allowed_origins: str = "http://localhost:3000"
     malware_scan_enabled: bool = False
@@ -59,6 +60,10 @@ class Settings(BaseSettings):
             raise ValueError("DOCUMENT_STORAGE_BACKEND must be local or s3.")
         if self.document_storage_backend == "s3" and not self.object_storage_bucket:
             raise ValueError("OBJECT_STORAGE_BUCKET is required when S3 storage is enabled.")
+        if self.object_storage_server_side_encryption not in {"", "AES256", "aws:kms"}:
+            raise ValueError("OBJECT_STORAGE_SERVER_SIDE_ENCRYPTION must be empty, AES256 or aws:kms.")
+        if self.environment.lower() == "production" and self.document_storage_backend == "s3" and not self.object_storage_server_side_encryption:
+            raise ValueError("Production S3 storage requires server-side encryption backed by a configured KMS.")
         access_key_set = bool(self.object_storage_access_key and self.object_storage_access_key.get_secret_value())
         secret_key_set = bool(self.object_storage_secret_key and self.object_storage_secret_key.get_secret_value())
         if self.document_storage_backend == "s3" and access_key_set != secret_key_set:
