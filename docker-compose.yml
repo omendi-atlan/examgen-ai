@@ -16,8 +16,12 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://examgen:examgen_dev_only@db:5432/examgen}
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-development-only-change-this-secret-before-deploy}
       ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+      DOCUMENT_STORAGE_PATH: /srv/examgen/data/documents
+      MAX_DOCUMENT_UPLOAD_BYTES: ${MAX_DOCUMENT_UPLOAD_BYTES:-26214400}
     ports:
       - "8000:8000"
+    volumes:
+      - examgen-document-data:/srv/examgen/data/documents
     depends_on:
       db:
         condition: service_healthy
@@ -40,3 +44,4 @@ services:
 
 volumes:
   examgen-postgres-data:
+  examgen-document-data:
