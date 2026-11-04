@@ -23,6 +23,7 @@ from app.models import (
     DocumentVersion,
     ExtractionJobStatus,
     ExtractionStatus,
+    LearningOutcome,
     MembershipRole,
     Subject,
     Topic,
@@ -36,6 +37,8 @@ from app.schemas.academic import (
     ExtractionResponse,
     ExtractionReviewRequest,
     ExtractionReviewResponse,
+    LearningOutcomeCreate,
+    LearningOutcomeResponse,
     SubjectCreate,
     SubjectResponse,
     TextSegmentResponse,
@@ -731,5 +734,86 @@ def list_document_extraction_reviews(
             select(DocumentExtractionReview)
             .where(DocumentExtractionReview.version_id == version_id)
             .order_by(DocumentExtractionReview.created_at, DocumentExtractionReview.id)
+        ).all()
+    )
+
+
+@router.post(
+    "/workspaces/{workspace_id}/taxonomy/topics/{topic_id}/learning-outcomes",
+    response_model=LearningOutcomeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_learning_outcome(
+    workspace_id: UUID,
+    topic_id: UUID,
+    payload: LearningOutcomeCreate,
+    db: DatabaseSession,
+    membership: WorkspaceEditor,
+) -> LearningOutcome:
+    """Create an explicit assessable outcome under a topic in this workspace."""
+    topic = db.scalar(
+        select(Topic).where(
+            Topic.id == topic_id,
+            Topic.workspace_id == workspace_id,
+        )
+    )
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found in this workspace.")
+    outcome = LearningOutcome(
+        workspace_id=workspace_id,
+        topic_id=topic_id,
+        code=payload.code,
+        description=payload.description,
+        created_by=membership.user_id,
+    )
+    db.add(outcome)
+    try:
+        db.flush()
+        record_audit_event(
+            db,
+            action="taxonomy.learning_outcome_created",
+            resource_type="learning_outcome",
+            resource_id=str(outcome.id),
+            actor_user_id=membership.user_id,
+            workspace_id=workspace_id,
+            event_data={"topic_id": str(topic_id), "code": payload.code},
+        )
+        db.commit()
+        db.refresh(outcome)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Learning outcome code already exists under this topic.",
+        ) from None
+    return outcome
+
+
+@router.get(
+    "/workspaces/{workspace_id}/taxonomy/topics/{topic_id}/learning-outcomes",
+    response_model=list[LearningOutcomeResponse],
+)
+def list_learning_outcomes(
+    workspace_id: UUID,
+    topic_id: UUID,
+    db: DatabaseSession,
+    _membership: WorkspaceEditor,
+) -> list[LearningOutcome]:
+    topic = db.scalar(
+        select(Topic).where(
+            Topic.id == topic_id,
+            Topic.workspace_id == workspace_id,
+        )
+    )
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found in this workspace.")
+    return list(
+        db.scalars(
+            select(LearningOutcome)
+            .where(
+                LearningOutcome.workspace_id == workspace_id,
+                LearningOutcome.topic_id == topic_id,
+            )
+            .order_by(LearningOutcome.code)
         ).all()
     )

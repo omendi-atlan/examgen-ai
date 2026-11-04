@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0b1018;
+  color: #f4f6fa;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 85% 0%, #1b2634 0, #0b1018 42rem); }
+a { color: #55d5e8; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.shell { max-width: 1120px; margin: 0 auto; padding: 28px 18px 42px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #293242; }
+.brand { color: #ff8a35; font-weight: 900; letter-spacing: .02em; }
+nav { display: flex; flex-wrap: wrap; gap: 18px; font-size: 12px; }
+.intro { margin: 28px 0 22px; max-width: 800px; }
+.eyebrow { color: #ff8a35; font-size: 11px; font-weight: 800; letter-spacing: .15em; }
+h1 { margin: 7px 0; font-size: clamp(28px, 4vw, 42px); }
+.intro p:last-child { color: #9aa5b5; line-height: 1.7; }
+.panel { margin-top: 16px; padding: 20px; border: 1px solid #293242; border-radius: 14px; background: #11151e; }
+.panel h2 { margin: 0 0 16px; font-size: 18px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+label { display: block; color: #cbd3df; font-size: 13px; }
+.wide { grid-column: 1 / -1; }
+input, select, textarea { width: 100%; margin-top: 6px; padding: 11px 12px; border: 1px solid #364154; border-radius: 8px; background: #0b1018; color: #f4f6fa; font: inherit; }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid #55d5e8; outline-offset: 2px; }
+button { border: 0; border-radius: 8px; padding: 11px 15px; background: #ff8a35; color: #20140b; font-weight: 800; cursor: pointer; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.status { min-height: 20px; color: #75d9a5; font-size: 13px; }
+.status.error { color: #ff9a9a; }
+.section-heading, .exam-heading, .submit-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; }
+.section-heading h2 { margin: 0; }
+.history { display: grid; gap: 9px; margin-top: 14px; }
+.history-item { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px; border: 1px solid #364154; border-radius: 9px; }
+.history-item small, .muted { color: #9aa5b5; font-size: 12px; }
+.exam-heading { border-bottom: 1px solid #293242; padding-bottom: 14px; }
+.exam-heading h2 { margin: 5px 0; }
+.timer-wrap { min-width: 100px; text-align: right; }
+.timer-wrap strong { display: block; color: #55d5e8; font-size: 28px; font-variant-numeric: tabular-nums; }
+.timer-wrap strong.warning { color: #ff9a9a; }
+.timer-wrap span { color: #9aa5b5; font-size: 11px; }
+.question-card { padding: 18px 0; border-bottom: 1px solid #293242; }
+.question-card:last-child { border-bottom: 0; }
+.question-card h3 { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.question-card h3 span { color: #55d5e8; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.question-stem { line-height: 1.7; white-space: pre-wrap; }
+.option-list { display: grid; gap: 10px; margin-top: 12px; }
+.option { display: flex; align-items: flex-start; gap: 9px; color: #cbd3df; font-size: 13px; }
+.option input { width: auto; margin: 2px 0 0; }
+.response-input { margin-top: 12px; }
+.review { margin-top: 12px; padding: 12px; border-radius: 8px; background: #0b1018; }
+.review p { color: #cbd3df; font-size: 13px; line-height: 1.6; }
+.review pre { color: #cbd3df; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.submit-row { border-top: 1px solid #293242; padding-top: 16px; margin-top: 14px; }
+.result-summary { margin-top: 16px; padding: 14px; border-radius: 9px; background: #0b1018; color: #75d9a5; }
+footer { padding: 25px 0 0; color: #778497; font-size: 11px; line-height: 1.6; }
+[hidden] { display: none !important; }
+@media (max-width: 640px) {
+  .shell { padding: 20px 14px 32px; }
+  .form-grid { grid-template-columns: 1fr; }
+  .wide { grid-column: auto; }
+  .topbar { align-items: flex-start; flex-direction: column; }
+  nav { gap: 14px; }
+  .panel { padding: 15px; }
+}

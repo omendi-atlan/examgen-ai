@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10151f">
+  <title>Practice Examination | EXAMGEN AI</title>
+  <link rel="stylesheet" href="/practice/styles.css">
+  <script src="/practice/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/">EXAMGEN AI</a>
+      <nav aria-label="Coursework navigation">
+        <a href="/coursework">My resources</a>
+        <a href="/coursework/questions">Question bank</a>
+      </nav>
+    </header>
+
+    <section class="intro">
+      <p class="eyebrow">STUDENT COURSEWORK · TIMED PRACTICE</p>
+      <h1>Practice examinations</h1>
+      <p>Attempt a private examination assembled from your question bank. Your answers autosave, the server controls the deadline, and model answers are released only after submission.</p>
+    </section>
+
+    <p id="global-status" class="status" role="status" aria-live="polite"></p>
+
+    <section id="account-panel" class="panel">
+      <h2>1. Your coursework account</h2>
+      <form id="login-form" class="form-grid">
+        <label class="wide">Python API URL
+          <input id="api-base" type="url" value="http://localhost:8000" autocomplete="url" required>
+        </label>
+        <label>Email
+          <input id="email" type="email" autocomplete="username" required>
+        </label>
+        <label>Password
+          <input id="password" type="password" autocomplete="current-password" required>
+        </label>
+        <div class="wide">
+          <button type="submit" id="login-button">Sign in</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="selection-panel" class="panel" hidden>
+      <h2>2. Select your subject and examination</h2>
+      <div class="form-grid">
+        <label>Workspace
+          <select id="workspace-select"><option value="">Choose workspace</option></select>
+        </label>
+        <label>Subject / module
+          <select id="subject-select" disabled><option value="">Choose subject</option></select>
+        </label>
+        <label class="wide">Practice examination
+          <select id="exam-select" disabled><option value="">Choose examination</option></select>
+        </label>
+      </div>
+    </section>
+
+    <section id="history-panel" class="panel" hidden>
+      <div class="section-heading">
+        <h2>3. Your attempts</h2>
+        <button id="start-button" type="button" disabled>Start new attempt</button>
+      </div>
+      <div id="attempt-history" class="history"></div>
+    </section>
+
+    <section id="attempt-panel" class="panel" hidden>
+      <div class="exam-heading">
+        <div>
+          <p class="eyebrow">PRACTICE SESSION</p>
+          <h2 id="attempt-title"></h2>
+          <p id="attempt-meta" class="muted"></p>
+        </div>
+        <div class="timer-wrap">
+          <strong id="timer" aria-live="off">--:--</strong>
+          <span id="timer-caption">Time remaining</span>
+        </div>
+      </div>
+      <p id="save-indicator" class="muted" role="status" aria-live="polite">No unsaved changes</p>
+      <div id="question-list"></div>
+      <div id="submit-row" class="submit-row">
+        <p class="muted">Responses autosave after a short pause. The server enforces the deadline.</p>
+        <button id="submit-button" type="button">Submit examination</button>
+      </div>
+      <div id="result-summary" class="result-summary" hidden></div>
+    </section>
+
+    <footer>EXAMGEN AI · This is a practice simulation. Server time is authoritative; browser timers are display aids. Written responses may require further marking.</footer>
+  </main>
+</body>
+</html>
