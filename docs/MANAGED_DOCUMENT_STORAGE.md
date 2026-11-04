@@ -46,3 +46,8 @@ Set `DOCUMENT_STORAGE_BACKEND=local` for both API and worker and restore the ori
 - Enable bucket versioning and provider-side access logging according to the deployment's retention policy.
 - Alert on object upload, head, download, integrity and delete failures.
 - Do not make the bucket public or generate browser-facing presigned URLs for source materials.
+
+
+## Integration note
+
+This MinIO development profile is stacked after the student coursework resource API in PR #24. It is for local development and does not replace the separate live staging-provider qualification gate.
