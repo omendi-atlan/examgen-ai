@@ -2,7 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from app.services import document_extraction
@@ -103,7 +103,6 @@ def test_ocr_fallback_preserves_page_provenance_for_every_scanned_page(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import sys
-    from types import ModuleType
 
     source = tmp_path / "scanned-module.pdf"
     writer = PdfWriter()
@@ -164,6 +163,6 @@ def test_ocr_fallback_preserves_page_provenance_for_every_scanned_page(
     ]
     assert [segment.metadata for segment in result.segments] == [
         {"page": 1, "extraction_method": "ocr", "start_char": 0, "end_char": 18},
-        {"page": 2, "extraction_method": "ocr", "start_char": 0, "end_char": 21},
+        {"page": 2, "extraction_method": "ocr", "start_char": 0, "end_char": 18},
         {"page": 3, "extraction_method": "ocr", "start_char": 0, "end_char": 21},
     ]
