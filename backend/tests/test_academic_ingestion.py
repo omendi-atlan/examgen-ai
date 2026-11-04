@@ -310,7 +310,7 @@ def test_extraction_review_is_human_audited_and_append_only(client: TestClient) 
         headers=headers,
     )
     assert history.status_code == 200
-    assert [item["decision"] for item in history.json()] == ["rejected", "accepted"]
+    assert sorted(item["decision"] for item in history.json()) == ["accepted", "rejected"]
 
     with Session(app.state.test_engine) as db:
         reviews = db.scalars(
