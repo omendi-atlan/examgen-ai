@@ -16,6 +16,7 @@ from app.models import (
     User,
     Workspace,
 )
+from app.services import document_processing
 from app.services.document_processing import claim_next_job, recover_expired_jobs
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -135,3 +136,29 @@ def test_expired_job_at_attempt_limit_is_terminal(postgres_sessions) -> None:
         assert job.status == ExtractionJobStatus.FAILED
         assert job.finished_at is not None
         assert job.lease_token is None
+
+
+
+def test_worker_heartbeat_extends_only_the_current_lease(
+    postgres_sessions, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    job_id = _queued_jobs(postgres_sessions, 1)[0]
+    token = uuid4()
+    with postgres_sessions() as db:
+        job = db.get(DocumentProcessingJob, job_id)
+        job.status = ExtractionJobStatus.PROCESSING
+        job.attempts = 1
+        job.lease_token = token
+        job.lease_expires_at = time.time() + 30
+        original_expiry = job.lease_expires_at
+        db.commit()
+    monkeypatch.setattr(document_processing, "SessionLocal", postgres_sessions)
+
+    assert document_processing.heartbeat_job(job_id, token) is True
+    with postgres_sessions() as db:
+        job = db.get(DocumentProcessingJob, job_id)
+        assert job.lease_expires_at > original_expiry
+        job.lease_token = uuid4()
+        db.commit()
+
+    assert document_processing.heartbeat_job(job_id, token) is False
