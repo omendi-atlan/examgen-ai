@@ -56,7 +56,7 @@ class BlueprintVersionCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_blueprint_constraints(self):
-        """Require valid percentages, unique topic weights and exact mark coverage."""
+        """Require valid distributions and exact topic/outcome mark coverage."""
         distributions = (
             ("cognitive_distribution", COGNITIVE_LEVELS),
             ("difficulty_distribution", DIFFICULTY_LEVELS),
@@ -76,6 +76,11 @@ class BlueprintVersionCreate(BaseModel):
             raise ValueError("A topic may appear only once in the blueprint mark allocation.")
         if sum(item.target_marks for item in self.topic_weights) != self.total_marks:
             raise ValueError("Topic target marks must sum exactly to the blueprint total marks.")
+        outcome_ids = [item.learning_outcome_id for item in self.outcome_weights]
+        if len(outcome_ids) != len(set(outcome_ids)):
+            raise ValueError("A learning outcome may appear only once in the blueprint mark allocation.")
+        if sum(item.target_marks for item in self.outcome_weights) != self.total_marks:
+            raise ValueError("Learning-outcome target marks must sum exactly to the blueprint total marks.")
         if self.question_count > self.total_marks:
             raise ValueError("Question count cannot exceed total marks.")
         return self
