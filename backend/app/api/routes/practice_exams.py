@@ -439,6 +439,7 @@ def get_practice_attempt(
 @router.put(
     "/workspaces/{workspace_id}/subjects/{subject_id}/practice-attempts/{attempt_id}/responses/{exam_question_id}",
     response_model=PracticeAttemptResponseModel,
+    response_model_exclude_none=True,
 )
 def save_practice_response(
     workspace_id: UUID,
@@ -489,6 +490,7 @@ def save_practice_response(
 @router.post(
     "/workspaces/{workspace_id}/subjects/{subject_id}/practice-attempts/{attempt_id}/submit",
     response_model=PracticeAttemptResponseModel,
+    response_model_exclude_none=True,
 )
 def submit_practice_attempt(
     workspace_id: UUID,
