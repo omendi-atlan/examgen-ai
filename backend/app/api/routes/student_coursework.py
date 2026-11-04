@@ -29,7 +29,7 @@ from app.models import (
     Subject,
     WorkspaceMembership,
 )
-from app.schemas.academic import DocumentResponse, TextSegmentResponse
+from app.schemas.academic import DocumentResponse, SubjectResponse, TextSegmentResponse
 from app.services.audit import record_audit_event
 
 router = APIRouter(tags=["student-coursework-resources"])
@@ -92,6 +92,25 @@ def _visible_document(
         # Do not disclose whether another student's private resource exists.
         raise HTTPException(status_code=404, detail="Coursework resource not found.")
     return document
+
+
+@router.get(
+    "/workspaces/{workspace_id}/subjects",
+    response_model=list[SubjectResponse],
+)
+def list_coursework_subjects(
+    workspace_id: UUID,
+    db: DatabaseSession,
+    _membership: ActiveMember,
+) -> list[Subject]:
+    """Expose the workspace's canonical subject list to active coursework members."""
+    return list(
+        db.scalars(
+            select(Subject)
+            .where(Subject.workspace_id == workspace_id)
+            .order_by(Subject.name)
+        ).all()
+    )
 
 
 @router.put(
