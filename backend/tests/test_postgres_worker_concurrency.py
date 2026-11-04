@@ -16,8 +16,8 @@ from app.models import (
     Workspace,
 )
 from app.services import document_processing
-from app.services.document_processing import claim_next_job, recover_expired_jobs
-from sqlalchemy import create_engine, select
+from app.services.document_processing import claim_next_job, recover_expired_jobs\nfrom app.api.dependencies import enforce_auth_rate_limit
+from fastapi import HTTPException\nfrom starlette.requests import Request\nfrom sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -82,7 +82,7 @@ def _queued_jobs(factory, count: int) -> list[UUID]:
 
 
 def test_postgres_workers_claim_distinct_jobs_concurrently(postgres_sessions) -> None:
-    _queued_jobs(postgres_sessions, 2)
+    _queued_jobs(postgres_sessions, 12)
 
     def claim_one():
         with postgres_sessions() as db:
@@ -161,3 +161,41 @@ def test_worker_heartbeat_extends_only_the_current_lease(
         db.commit()
 
     assert document_processing.heartbeat_job(job_id, token) is False
+
+
+def test_postgres_rate_limit_counter_is_atomic_across_concurrent_requests(
+    postgres_sessions,
+) -> None:
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/auth/login",
+            "headers": [],
+            "client": ("198.51.100.42", 12345),
+            "server": ("testserver", 80),
+            "scheme": "http",
+        }
+    )
+
+    def attempt() -> bool:
+        with postgres_sessions() as db:
+            try:
+                enforce_auth_rate_limit(
+                    request,
+                    db,
+                    scope="concurrency-test",
+                    subject="same-client",
+                    limit=5,
+                    window_seconds=900,
+                )
+                return True
+            except HTTPException as exc:
+                assert exc.status_code == 429
+                return False
+
+    with ThreadPoolExecutor(max_workers=10) as workers:
+        outcomes = list(workers.map(lambda _index: attempt(), range(20)))
+
+    assert sum(outcomes) == 5
+    assert outcomes.count(False) == 15
