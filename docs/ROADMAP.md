@@ -32,7 +32,7 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Establish explicit workspace-owned subject/topic taxonomy and human-confirmed version classification.
 - [x] Add page-level OCR fallback for image-only PDF pages using PDFium and Tesseract, retaining page locators and OCR provenance.
 - [x] Add fail-closed ClamAV scanning before permanent upload acceptance; production startup requires scanning to be enabled.
-- [ ] Add a managed object-storage adapter and safe migration from private local volumes.
+- [x] Add a managed S3-compatible object-storage adapter, immutable-key migration utility, checksum verification, rollback guidance and private-bucket operational controls.
 - [x] Add a durable database-backed extraction queue and separately deployed worker process.
 - [x] Add PostgreSQL 16 CI migrations and multi-worker claim/lease-recovery integration tests.
 - [x] Add an examiner review UI for source versions, extraction quality and source-addressable segments.

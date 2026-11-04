@@ -2,7 +2,6 @@
 
 import logging
 import time
-from pathlib import Path
 from threading import Event, Thread
 from uuid import UUID, uuid4
 
@@ -19,7 +18,7 @@ from app.models import (
     ExtractionStatus,
 )
 from app.services.document_extraction import extract_document
-from app.services.document_storage import resolve_storage_path
+from app.services.object_storage import open_storage_file
 
 logger = logging.getLogger(__name__)
 MIN_REVIEW_CHARACTERS_PER_PAGE = 40
@@ -194,13 +193,15 @@ def process_job(db: Session, job_id: UUID) -> bool:
     version_id = job.version.id
     storage_key = job.version.storage_key
     extension = job.version.file_extension
+    expected_size = job.version.size_bytes
+    expected_sha256 = job.version.sha256
     db.rollback()
 
     try:
-        source_path = resolve_storage_path(
-            Path(get_settings().document_storage_path), storage_key
-        )
-        result = extract_document(source_path, extension, enable_ocr=True)
+        with open_storage_file(
+            storage_key, expected_size=expected_size, expected_sha256=expected_sha256
+        ) as source_path:
+            result = extract_document(source_path, extension, enable_ocr=True)
     except Exception as exc:
         logger.exception("Document processing failed for version %s", version_id)
         return _record_failure(db, job_id, lease_token, exc)

@@ -43,7 +43,8 @@ from app.schemas.academic import (
     TopicResponse,
 )
 from app.services.audit import record_audit_event
-from app.services.document_storage import resolve_storage_path, store_upload
+from app.services.document_storage import store_upload
+from app.services.object_storage import delete_file
 
 router = APIRouter(tags=["academic-ingestion"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
@@ -162,7 +163,6 @@ async def _ingest_version(
         Path(settings.document_storage_path),
         settings.max_document_upload_bytes,
     )
-    storage_path = resolve_storage_path(Path(settings.document_storage_path), stored.storage_key)
     existing = db.scalar(
         select(DocumentVersion).where(
             DocumentVersion.document_id == document.id,
@@ -170,7 +170,7 @@ async def _ingest_version(
         )
     )
     if existing is not None:
-        storage_path.unlink(missing_ok=True)
+        delete_file(stored.storage_key)
         raise HTTPException(status_code=409, detail="This exact file version already exists.")
 
     version_number = document.current_version_number + 1 if document.id else 1
@@ -245,7 +245,7 @@ async def _ingest_version(
         return version
     except Exception:
         db.rollback()
-        storage_path.unlink(missing_ok=True)
+        delete_file(stored.storage_key)
         raise
 
 

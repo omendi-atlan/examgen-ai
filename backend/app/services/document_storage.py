@@ -11,6 +11,7 @@ from uuid import uuid4
 from fastapi import HTTPException, UploadFile, status
 
 from app.services.malware_scanning import MalwareDetectedError, scan_file
+from app.services.object_storage import persist_file
 
 SUPPORTED_TYPES = {
     ".pdf": "application/pdf",
@@ -132,9 +133,7 @@ async def store_upload(
 
         object_id = uuid4().hex
         storage_key = f"{object_id[:2]}/{object_id}{extension}"
-        destination = storage_root / storage_key
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        os.replace(temporary_path, destination)
+        persist_file(temporary_path, storage_key)
         temporary_path = None
         return StoredUpload(
             storage_key=storage_key,

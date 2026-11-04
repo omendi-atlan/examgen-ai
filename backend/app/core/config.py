@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 15
     jwt_issuer: str = "examgen-ai"
     document_storage_path: str = "./data/documents"
+    document_storage_backend: str = "local"
+    object_storage_bucket: str | None = None
+    object_storage_region: str = "af-south-1"
+    object_storage_endpoint_url: str | None = None
+    object_storage_access_key: SecretStr | None = None
+    object_storage_secret_key: SecretStr | None = None
     max_document_upload_bytes: int = 20000000
     cors_allowed_origins: str = "http://localhost:3000"
     malware_scan_enabled: bool = False
@@ -49,6 +55,14 @@ class Settings(BaseSettings):
             "development-only-"
         ):
             raise ValueError("A production AUTH_SECRET_KEY must be explicitly configured.")
+        if self.document_storage_backend not in {"local", "s3"}:
+            raise ValueError("DOCUMENT_STORAGE_BACKEND must be local or s3.")
+        if self.document_storage_backend == "s3" and not self.object_storage_bucket:
+            raise ValueError("OBJECT_STORAGE_BUCKET is required when S3 storage is enabled.")
+        access_key_set = bool(self.object_storage_access_key and self.object_storage_access_key.get_secret_value())
+        secret_key_set = bool(self.object_storage_secret_key and self.object_storage_secret_key.get_secret_value())
+        if self.document_storage_backend == "s3" and access_key_set != secret_key_set:
+            raise ValueError("S3 access key and secret key must be configured together.")
         if not 1 <= self.access_token_ttl_minutes <= 60:
             raise ValueError("ACCESS_TOKEN_TTL_MINUTES must be between 1 and 60.")
         if not 1024 <= self.max_document_upload_bytes <= 104857600:
