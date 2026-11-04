@@ -6,7 +6,7 @@
 - `DOCUMENT_STORAGE_BACKEND=local` preserves the existing private-volume implementation.
 - `DOCUMENT_STORAGE_BACKEND=s3` selects an S3-compatible private bucket for uploads and worker reads.
 - API and worker processes must use the same backend, bucket, region, endpoint and credentials/workload identity.
-- S3 objects are uploaded with server-side AES-256 encryption. No public ACL is applied. Keep bucket public-access blocks enabled and require TLS in the bucket policy.
+- AWS S3 uploads request SSE-S3 (AES256) where supported. Cloudflare R2 encrypts all objects and metadata at rest automatically with AES-256; the adapter deliberately omits the unsupported `x-amz-server-side-encryption` request header for R2. No public ACL is applied. Keep the R2 bucket private and require HTTPS/TLS.
 - The browser never receives object-store credentials or object URLs. Downloads are performed by the server-side worker.
 - Worker reads verify the stored object's byte length and SHA-256 against the immutable `document_versions` row before extraction.
 
@@ -20,6 +20,18 @@
 6. Re-run the migration after an interrupted run. Uploading to the same immutable object key is idempotent; database rows and keys are not rewritten.
 7. Deploy API and worker with the S3 backend and run ingestion plus extraction smoke tests. Keep local copies and backups during the observation window.
 8. Only after a verified backup, successful worker reads and an approved rollback window may operators retire the old local volume. The migration utility's optional `--delete-local` flag is deliberately explicit and should not be used during initial cutover.
+
+## Cloudflare R2 configuration
+
+For Cloudflare R2, configure the following values for both the API and document-worker processes:
+
+- `DOCUMENT_STORAGE_BACKEND=s3`
+- `OBJECT_STORAGE_BUCKET=<private-staging-bucket-name>`
+- `OBJECT_STORAGE_REGION=auto` (required by the R2 S3 API)
+- `OBJECT_STORAGE_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (use the jurisdiction-specific endpoint if the bucket is jurisdiction-bound)
+- `OBJECT_STORAGE_ACCESS_KEY` and `OBJECT_STORAGE_SECRET_KEY` from an R2 API token scoped to **Object Read & Write** for this bucket only.
+
+Use the account ID and S3 endpoint shown in the Cloudflare R2 dashboard. Keep the bucket private; do not enable `r2.dev` or a public custom domain for academic source material. R2 encrypts stored objects at rest automatically. Its S3 API does not implement the standard SSE request header, so the adapter omits that header for R2 while retaining the SHA-256 metadata and post-upload HEAD verification. Generic AWS S3 continues to request SSE-S3. See the [R2 S3 setup](https://developers.cloudflare.com/r2/get-started/s3/), [R2 token permissions](https://developers.cloudflare.com/r2/api/tokens/) and [R2 data security](https://developers.cloudflare.com/r2/reference/data-security/).
 
 ## Provider smoke test
 
