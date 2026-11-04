@@ -61,8 +61,9 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
 - [x] Integrate workspace-scoped learning outcomes and immutable, versioned blueprint authoring with exact topic/outcome marks, cognitive/difficulty/question-type distributions and moderator approval.
-- [ ] Add reusable question lifecycle, source provenance, deduplication, model answers and rubrics.
-- [ ] Validate approved question versions against blueprint mark, topic/outcome coverage and distribution constraints before assembly.
+- [x] Add reusable, append-only question versions with explicit subject/topic/outcome mapping, source-segment provenance, content fingerprints, type-specific response contracts, server-side answer keys and rubric validation.
+- [x] Add private-by-default AI question generation from approved blueprints, with exact mark/topic/outcome/cognitive/difficulty/type distribution validation and source-citation checks.
+- [ ] Add formal examination assembly from approved question versions, immutable published paper snapshots and student-safe answer-key separation.
 
 ### Phase 4 — Visual intelligence and moderation
 - Visual requirement analysis, generation adapter, validation, approval workflow and moderation report.
@@ -91,7 +92,7 @@ See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICA
 
 ## Student coursework resource experience — product requirement
 
-**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Its inspected CI run passed Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. Draft PR #26 adds Playwright browser qualification; its initial browser run passed all 3 scenarios (resource lifecycle, failed-extraction retry/default-private controls, and camera capture-to-PDF using Chromium's fake camera). The browser suite mocks the API and is not a live staging qualification. PR #26 also adds a production-dependency high-severity npm audit gate; that latest CI run must finish before this qualification milestone is declared complete. Both PRs remain unmerged and undeployed. Real-device camera, full accessibility and live staging qualification remain open.
+**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. PR #26's latest inspected CI passed 64 backend tests, PostgreSQL 16 migrations, frontend typecheck/lint/build, all 3 Playwright coursework scenarios and the high-severity dependency audit gate. Six moderate findings remain in development dependencies. The browser suite mocks the API and is not live staging qualification. PR #27 integrates the blueprint foundation and passed 69 backend tests, migration and frontend/browser checks. Draft PR #28 adds question-bank models, source-cited generation, safe student responses and a student generation page; its CI qualification is in progress. All PRs remain unmerged and undeployed. Real-device camera, full WCAG 2.2 AA/assistive-technology and live staging qualification remain open.
 
 Academic resource ingestion is a feature inside the student's existing subject/module coursework experience. A student opens a subject or module and uses its normal **Upload resource** or **Scan resource** action to add lecture notes, slides, prescribed readings, worksheets, diagrams or previous assessments. EXAMGEN AI performs validation, malware scanning, extraction/OCR, provenance capture and processing asynchronously in the background. The student sees progress and usable extracted material in that same coursework context. This is not a separate ingestion portal and does not require the student to operate taxonomy or examiner-review tooling.
 
