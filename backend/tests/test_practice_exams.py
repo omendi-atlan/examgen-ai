@@ -8,8 +8,6 @@ from app.core.database import Base, get_db
 from app.main import app
 from app.models import (
     PracticeAttempt,
-    PracticeAttemptStatus,
-    PracticeExam,
     Question,
     QuestionReviewStatus,
     QuestionVersion,
