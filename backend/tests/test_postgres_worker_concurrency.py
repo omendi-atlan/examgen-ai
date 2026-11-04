@@ -1,5 +1,6 @@
 """Real PostgreSQL tests for worker lease recovery and SKIP LOCKED concurrency."""
 
+import hashlib
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -12,9 +13,11 @@ from app.core.database import Base
 from app.main import app
 from app.models import (
     AcademicDocument,
+    DocumentExtraction,
     DocumentProcessingJob,
     DocumentVersion,
     ExtractionJobStatus,
+    ExtractionStatus,
     MembershipRole,
     User,
     Workspace,
@@ -22,6 +25,7 @@ from app.models import (
 )
 from app.services import document_processing, document_storage
 from app.services.document_processing import claim_next_job, recover_expired_jobs
+from app.services.object_storage import persist_file
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -450,3 +454,136 @@ def test_postgres_academic_routes_enforce_role_and_tenant_boundaries(
     finally:
         app.dependency_overrides.clear()
         settings.document_storage_path = previous_storage_path
+
+
+def test_postgres_workers_process_real_scanned_pdf_jobs_concurrently(
+    postgres_sessions, tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise real OCR, local object reads and persisted segments via concurrent workers."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "document_storage_path", str(tmp_path / "private-objects"))
+    monkeypatch.setattr(settings, "document_storage_backend", "local")
+    monkeypatch.setattr(document_processing, "SessionLocal", postgres_sessions)
+
+    font = ImageFont.load_default(size=48)
+    source_files = []
+    for document_index in range(2):
+        pages = []
+        for page_number in range(1, 3):
+            image = Image.new("RGB", (1200, 1600), "white")
+            draw = ImageDraw.Draw(image)
+            draw.text(
+                (70, 100),
+                f"EXAMGEN WORKER MODULE {document_index + 1}",
+                fill="black",
+                font=font,
+            )
+            draw.text(
+                (70, 230),
+                f"SCANNED WORKER PAGE {page_number}",
+                fill="black",
+                font=font,
+            )
+            draw.text(
+                (70, 360),
+                "DATABASE NORMALIZATION AND RELATIONAL DESIGN",
+                fill="black",
+                font=font,
+            )
+            pages.append(image)
+        source = tmp_path / f"worker-source-{document_index}.pdf"
+        pages[0].save(
+            source,
+            format="PDF",
+            resolution=150,
+            save_all=True,
+            append_images=pages[1:],
+        )
+        source_files.append(source)
+
+    version_ids = []
+    with postgres_sessions() as db:
+        user = User(email=f"{uuid4()}@example.test", display_name="OCR worker")
+        workspace = Workspace(name="OCR worker tests", slug=f"ocr-{uuid4().hex[:12]}")
+        db.add_all([user, workspace])
+        db.flush()
+
+        for index, source in enumerate(source_files):
+            payload = source.read_bytes()
+            digest = hashlib.sha256(payload).hexdigest()
+            storage_key = f"{digest[:2]}/{uuid4().hex}.pdf"
+            persist_file(source, storage_key)
+            document = AcademicDocument(
+                workspace_id=workspace.id,
+                title=f"Scanned module {index + 1}",
+                created_by=user.id,
+                current_version_number=1,
+            )
+            db.add(document)
+            db.flush()
+            version = DocumentVersion(
+                document_id=document.id,
+                version_number=1,
+                original_filename=f"scanned-module-{index + 1}.pdf",
+                storage_key=storage_key,
+                media_type="application/pdf",
+                file_extension=".pdf",
+                size_bytes=len(payload),
+                sha256=digest,
+                uploaded_by=user.id,
+            )
+            db.add(version)
+            db.flush()
+            db.add(
+                DocumentExtraction(
+                    version_id=version.id,
+                    status=ExtractionStatus.QUEUED,
+                    parser_name="pending",
+                    parser_version="0",
+                    page_count=None,
+                    character_count=0,
+                    extraction_metadata={},
+                    quality_report={"outcome": "queued"},
+                )
+            )
+            db.add(
+                DocumentProcessingJob(
+                    version_id=version.id,
+                    status=ExtractionJobStatus.QUEUED,
+                    attempts=0,
+                    max_attempts=3,
+                )
+            )
+            version_ids.append(version.id)
+        db.commit()
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        claimed = list(workers.map(lambda _index: document_processing.run_once(), range(2)))
+
+    assert claimed == [True, True]
+    with postgres_sessions() as db:
+        jobs = db.scalars(
+            select(DocumentProcessingJob).where(
+                DocumentProcessingJob.version_id.in_(version_ids)
+            )
+        ).all()
+        assert len(jobs) == 2
+        assert all(job.status == ExtractionJobStatus.COMPLETED for job in jobs)
+
+        extractions = db.scalars(
+            select(DocumentExtraction).where(DocumentExtraction.version_id.in_(version_ids))
+        ).all()
+        assert len(extractions) == 2
+        assert all(extraction.status == ExtractionStatus.EXTRACTED for extraction in extractions)
+        for extraction in extractions:
+            assert extraction.page_count == 2
+            assert extraction.character_count > 0
+            assert len(extraction.segments) == 2
+            assert [segment.locator.split(":")[0] for segment in extraction.segments] == [
+                "page-1",
+                "page-2",
+            ]
+            assert all(segment.metadata_json["extraction_method"] == "ocr" for segment in extraction.segments)
+            assert all("EXAMGEN" in segment.text.upper() for segment in extraction.segments)
