@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type QualityReport = {
@@ -155,7 +156,7 @@ export default function DocumentReviewPage() {
   return (
     <main style={{ maxWidth: 1180, margin: "0 auto", padding: "28px 18px", color: "#f4f6fa" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, borderBottom: "1px solid #262e3b", paddingBottom: 18 }}>
-        <div><a href="/" style={{ color: "#ff8a35", textDecoration: "none", fontWeight: 900, letterSpacing: ".1em" }}>EXAMGEN AI</a><div style={{ color: "#9aa5b5", fontSize: 12, marginTop: 5 }}>ACADEMIC SOURCE REVIEW</div></div>
+        <div><Link href="/" style={{ color: "#ff8a35", textDecoration: "none", fontWeight: 900, letterSpacing: ".1em" }}>EXAMGEN AI</Link><div style={{ color: "#9aa5b5", fontSize: 12, marginTop: 5 }}>ACADEMIC SOURCE REVIEW</div></div>
         <span style={{ color: "#55d5e8", fontSize: 12 }}>{token ? "AUTHENTICATED SESSION" : "EXAMINER ACCESS"}</span>
       </header>
 
