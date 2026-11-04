@@ -9,13 +9,12 @@ import argparse
 import hashlib
 from pathlib import Path
 
-from sqlalchemy import select
-
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.models import DocumentVersion
 from app.services.document_storage import resolve_storage_path
 from app.services.object_storage import open_storage_file, persist_file
+from sqlalchemy import select
 
 
 def migrate(*, delete_local: bool = False) -> tuple[int, int]:
