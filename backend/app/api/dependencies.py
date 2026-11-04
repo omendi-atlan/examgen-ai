@@ -164,3 +164,20 @@ def limit_registration_attempts(
         limit=5,
         window_seconds=3600,
     )
+
+
+
+def limit_document_upload_attempts(
+    request: Request,
+    db: DatabaseSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """Limit authenticated source uploads per user and transport peer address."""
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="document_upload",
+        subject=str(current_user.id),
+        limit=20,
+        window_seconds=3600,
+    )
