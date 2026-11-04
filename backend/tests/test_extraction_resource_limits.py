@@ -3,10 +3,9 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+from app.services import document_extraction
 import pytest
 from pypdf import PdfWriter
-
-from app.services import document_extraction
 
 
 def test_pdf_page_count_limit_is_enforced_before_page_processing(
