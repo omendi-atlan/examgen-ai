@@ -123,7 +123,9 @@
     }
     header.appendChild(el("span", { class: "small muted", text: state.user.display_name || state.user.email }));
     header.appendChild(el("button", { class: "btn btn-sm btn-ghost", type: "button", text: "Sign out",
-      onclick: function () { api.store.token = ""; api.store.workspaceId = ""; state.workspace = null; renderShell(); renderAuth(); } }));
+      onclick: function () { api.store.token = ""; api.store.workspaceId = ""; state.workspace = null;
+        if (window.EXAMGEN && window.EXAMGEN.chat) window.EXAMGEN.chat.setContext(null);
+        renderShell(); renderAuth(); } }));
   }
 
   /* ---------------------------------------------------------------- workspaces */
@@ -134,6 +136,7 @@
 
   function renderWorkspaceList() {
     state.workspace = null;
+    if (window.EXAMGEN && window.EXAMGEN.chat) window.EXAMGEN.chat.setContext(null);
     clear(root());
     const container = el("div", { class: "container" });
     container.appendChild(el("div", { class: "section-head" }, [
@@ -213,6 +216,16 @@
     renderShell();
     await refreshWorkspace();
     renderWorkspace();
+    syncChatContext();
+  }
+
+  /* Tell the subject assistant which workspace is open. The assistant is
+     scoped to that subject only, so it must follow the portal's context. */
+  function syncChatContext() {
+    if (window.EXAMGEN && window.EXAMGEN.chat) {
+      window.EXAMGEN.chat.setContext(state.workspace
+        ? { id: state.workspace.id, name: state.workspace.name } : null);
+    }
   }
 
   async function refreshWorkspace() {

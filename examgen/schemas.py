@@ -374,3 +374,40 @@ class AnalyticsOut(BaseModel):
     mastery: dict
     recommendations: list[str]
     history: list[dict]
+
+
+# --------------------------------------------------------------------------
+# Subject assistant (grounded chat)
+# --------------------------------------------------------------------------
+
+class ChatMessageOut(ORMModel):
+    id: str
+    role: str
+    content: str
+    intent: str
+    citations: list[dict] = []
+    suggestions: list[str] = []
+    grounded: bool
+    created_at: datetime
+
+
+class ChatSessionOut(ORMModel):
+    id: str
+    workspace_id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChatSessionDetail(ChatSessionOut):
+    messages: list[ChatMessageOut] = []
+
+
+class ChatAskRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    session_id: str | None = None
+
+
+class ChatAskResponse(BaseModel):
+    session: ChatSessionOut
+    message: ChatMessageOut

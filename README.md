@@ -48,6 +48,12 @@ records and PDFs. Content from one subject is never mixed into another.
   classification and targeted revision recommendations.
 - **PDF deliverables** — a memorandum/marking guide and a subject mastery and
   examination preparation guide, both bound to the same examination version.
+- **Subject assistant (chatbot)** — a grounded chat panel on every subject
+  workspace. It answers only from that subject's uploaded coursework and cites
+  the exact document, section and page it used; it reports gaps and your
+  progress from persisted records, and says so plainly when it cannot find
+  material rather than inventing an answer. Conversations are persisted and
+  scoped to the workspace and the owning account.
 - **CLI** — the full workflow without a browser.
 
 ## Getting started
@@ -100,6 +106,8 @@ Authentication is a bearer JWT from `POST /api/auth/register` or
   `POST /api/attempts/{id}/submit`, `GET /api/attempts/{id}/result`
 - `GET .../analytics`, `POST .../examinations/{id}/deliverables`,
   `GET .../examinations/{id}/deliverables/{kind}/download`
+- `GET /api/assistant/prompts`, `POST/GET .../assistant/sessions`,
+  `POST .../assistant/ask` — the grounded subject assistant (chatbot)
 
 Interactive docs are served at `/docs`.
 
@@ -109,12 +117,14 @@ Interactive docs are served at `/docs`.
 examgen/
   api/          FastAPI application and routers (auth, workspaces, exams)
   services/     Domain logic: extraction, classification, generation,
-                visuals, examination, moderation, marking, analytics, pdf
+                visuals, examination, moderation, marking, analytics, pdf,
+                assistant (grounded subject chatbot)
   models.py     SQLAlchemy entity model
   schemas.py    Pydantic request/response contracts
   security.py   Password hashing, JWT auth, workspace authorisation
   cli.py        Command line interface
-  static/       Vanilla JS/HTML frontend (portal + examination website)
+  static/       Vanilla JS/HTML frontend (portal + examination website +
+                subject assistant chat panel)
   templates/    Jinja templates
 tests/          Milestone acceptance tests (M1–M8) plus CLI coverage
 ```
@@ -190,4 +200,6 @@ python -m pytest -q
 The suite covers milestones 1–8: resource management and isolation, visual
 assessment, question bank and generation, moderation and publication, the
 examination website, practice/formal execution, marking and analytics, PDF
-deliverables, and the CLI.
+deliverables, and the CLI. It also covers the subject assistant: grounded
+answers with citations, refusal to fabricate, navigational intents, persisted
+conversations, and workspace/ownership isolation.

@@ -10,7 +10,8 @@ Milestones M1–M8 are implemented and covered by tests.
 
 ## Layout
 
-- `examgen/api/` — FastAPI app and routers (`auth`, `workspaces`, `exams`)
+- `examgen/api/` — FastAPI app and routers (`auth`, `workspaces`, `exams`,
+  `assistant`)
 - `examgen/services/` — domain logic; the place most changes belong
   - `extraction.py` — file → `ExtractedContent` chunks
   - `classification.py` — topics, subtopics, outcomes, sufficiency, duplicates
@@ -18,8 +19,10 @@ Milestones M1–M8 are implemented and covered by tests.
   - `visuals.py` — visual requirement assessment + SVG construction
   - `generation.py` — question generation and fingerprints
   - `examination.py` — blueprint → examination, snapshots, deliverables
+  - `assistant.py` — grounded subject chatbot (retrieval + intent composers)
   - `moderation.py`, `marking.py`, `analytics.py`, `pdf.py`, `workspace.py`
-- `examgen/static/js/` — `portal.js` (subject portal), `exam.js` (exam website)
+- `examgen/static/js/` — `portal.js` (subject portal), `exam.js` (exam website),
+  `chat.js` (subject assistant panel)
 - `tests/` — milestone acceptance tests + `test_cli.py`
 
 ## Commands
@@ -61,6 +64,13 @@ EXAMGEN_DATA_DIR=$PWD/data EXAMGEN_SECRET_KEY=dev-secret-key-for-local-demo-only
 - `textutil.keyword_hits` uses word boundaries for single words so short
   keywords don't match inside longer ones. Keep that when adding diagram
   keywords.
+- **The subject assistant (`services/assistant.py`) is grounded, not generative.**
+  `retrieve()` selects passages from the workspace's own chunks; the composers
+  only arrange them. Never let an assistant reply assert something that is not
+  either a retrieved excerpt or a value read from a persisted record. The
+  `_INTENTS` list is order-sensitive — the first match wins, so keep specific
+  navigational intents above the catch-all `explain`. Chat sessions are scoped
+  by `workspace_id` **and** `user_id`; keep both checks when adding routes.
 - Topic discovery folds n-gram fragments into full phrases (a bigram is dropped
   when a containing trigram is at least as frequent). Expect phrase-style topic
   names, not single words.

@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..config import get_settings
 from ..db import init_db
-from .routers import auth, exams, workspaces
+from .routers import assistant, auth, exams, workspaces
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -32,6 +32,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(exams.router)
+    app.include_router(assistant.router)
+    app.include_router(assistant.global_router)
 
     @app.exception_handler(ValueError)
     async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:

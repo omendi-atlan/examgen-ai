@@ -661,3 +661,50 @@ class ResourceSufficiencyReport(Base, TimestampMixin):
     document_count: Mapped[int] = mapped_column(Integer, default=0)
     total_chars: Mapped[int] = mapped_column(Integer, default=0)
     verdict: Mapped[str] = mapped_column(String(32), default="")
+
+
+# --------------------------------------------------------------------------
+# Subject assistant (grounded chat)
+# --------------------------------------------------------------------------
+
+class ChatSession(Base, TimestampMixin):
+    """A persisted assistant conversation, scoped to one subject workspace.
+
+    Conversations never span workspaces: the assistant can only ever cite
+    material from the workspace that owns the session.
+    """
+
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    workspace_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("subject_workspaces.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(255), default="New conversation")
+
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan")
+
+
+class ChatMessage(Base, TimestampMixin):
+    """One turn in a subject-assistant conversation.
+
+    ``citations`` records the exact coursework excerpts an answer was grounded
+    in so every claim remains traceable to a source document, and ``suggestions``
+    carries follow-up prompts the student can act on.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("chat_sessions.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[str] = mapped_column(String(32), index=True)
+    role: Mapped[str] = mapped_column(String(16), default="user")
+    content: Mapped[str] = mapped_column(Text, default="")
+    intent: Mapped[str] = mapped_column(String(32), default="")
+    citations: Mapped[list] = mapped_column(JSON, default=list)
+    suggestions: Mapped[list] = mapped_column(JSON, default=list)
+    grounded: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    session: Mapped[ChatSession] = relationship(back_populates="messages")
