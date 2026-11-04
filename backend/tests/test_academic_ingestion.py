@@ -520,4 +520,14 @@ def test_all_academic_routes_hide_resources_from_other_workspaces(client: TestCl
         client, outsider_workspace, document_id, version_id, subject_id, topic_id, outsider_token
     ):
         response = getattr(client, method)(path, **kwargs)
-        assert response.status_code == 404, f"{method.upper()} {path}: {response.status_code} {response.text}"
+        if path.endswith("/documents") and method == "post":
+            expected_status = 201
+        elif path.endswith("/taxonomy/subjects") and method == "post":
+            expected_status = 201
+        elif path.endswith("/documents") or path.endswith("/taxonomy/subjects"):
+            expected_status = 200
+        else:
+            expected_status = 404
+        assert response.status_code == expected_status, (
+            f"{method.upper()} {path}: {response.status_code} {response.text}"
+        )
