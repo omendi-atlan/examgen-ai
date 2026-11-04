@@ -101,10 +101,12 @@ def enforce_auth_rate_limit(
     subject: str,
     limit: int,
     window_seconds: int,
+    include_client: bool = True,
 ) -> None:
     """Atomically enforce a shared fixed-window limit across API processes."""
     client_host = request.client.host if request.client else "unknown"
-    digest = hashlib.sha256(f"{scope}:{client_host}:{subject.casefold()}".encode()).hexdigest()
+    client_component = client_host if include_client else "authenticated-subject"
+    digest = hashlib.sha256(f"{scope}:{client_component}:{subject.casefold()}".encode()).hexdigest()
     now = int(time.time())
     window_start = (now // window_seconds) * window_seconds
     table = ApiRateLimitBucket.__table__
@@ -176,8 +178,17 @@ def limit_document_upload_attempts(
     enforce_auth_rate_limit(
         request,
         db,
-        scope="document_upload",
+        scope="document_upload_ip",
+        subject="all",
+        limit=60,
+        window_seconds=3600,
+    )
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="document_upload_user",
         subject=str(current_user.id),
         limit=20,
         window_seconds=3600,
+        include_client=False,
     )

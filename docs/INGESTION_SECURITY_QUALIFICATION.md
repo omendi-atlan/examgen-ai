@@ -6,9 +6,9 @@ The API applies database-backed fixed-window limits to public identity endpoints
 
 - Login: 10 attempts per client address per 15-minute window.
 - Registration: 5 attempts per client address per 60-minute window.
-- Academic source uploads and version uploads: 20 combined attempts per authenticated user and transport peer address per 60-minute window.
+- Academic source uploads and version uploads: 20 combined attempts per authenticated account across client addresses per 60-minute window, plus 60 combined attempts per transport peer address per 60-minute window.
 - Exceeded requests return HTTP 429 and a `Retry-After` header.
-- Counters are updated with atomic PostgreSQL/SQLite upserts, so multiple API processes share the same limit.
+- Counters are updated with atomic PostgreSQL/SQLite upserts, so multiple API processes share the same limit. Account-scoped upload counters are independent of client IP, preventing a user from bypassing the account quota by changing addresses.
 - Counter keys are SHA-256 digests of scope, client address and subject; raw addresses are not stored in the rate-limit table.
 - Expired buckets older than 24 hours are pruned during authentication requests.
 
