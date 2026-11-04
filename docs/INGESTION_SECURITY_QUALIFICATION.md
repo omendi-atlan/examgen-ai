@@ -2,10 +2,11 @@
 
 ## Authentication abuse protection
 
-The API applies database-backed fixed-window limits to public identity endpoints:
+The API applies database-backed fixed-window limits to public identity endpoints and authenticated academic uploads:
 
 - Login: 10 attempts per client address per 15-minute window.
 - Registration: 5 attempts per client address per 60-minute window.
+- Academic source uploads and version uploads: 20 combined attempts per authenticated user and transport peer address per 60-minute window.
 - Exceeded requests return HTTP 429 and a `Retry-After` header.
 - Counters are updated with atomic PostgreSQL/SQLite upserts, so multiple API processes share the same limit.
 - Counter keys are SHA-256 digests of scope, client address and subject; raw addresses are not stored in the rate-limit table.
@@ -13,7 +14,7 @@ The API applies database-backed fixed-window limits to public identity endpoints
 
 The application uses the transport peer address (`request.client.host`) and intentionally does not trust arbitrary `X-Forwarded-For` values. In a reverse-proxy deployment, configure the ASGI server to trust forwarded headers only from explicitly trusted proxy addresses, and ensure direct access to the API container is blocked.
 
-These limits protect the public authentication endpoints. Production deployments should additionally enforce edge-level request and connection limits for all routes, including uploads, and configure request-body limits and timeouts at the ingress/load balancer.
+These limits protect authentication and bound accepted academic upload operations. Multipart request bodies may be received before FastAPI resolves endpoint dependencies; therefore application throttling is not a substitute for ingress-level body-size limits, connection/request rate limits, timeouts and TLS. Production deployments must enforce those controls at the reverse proxy or load balancer.
 
 ## Tenant and role qualification
 
