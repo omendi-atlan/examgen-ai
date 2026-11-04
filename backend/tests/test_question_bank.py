@@ -238,6 +238,30 @@ def test_student_private_question_has_no_answer_key_and_isolated_from_other_stud
     assert "model_answer" not in question["versions"][0]
     assert question["versions"][0]["citations"][0]["source_locator"] == "page:1"
 
+    duplicate = client.post(
+        f"/api/v1/workspaces/{context['workspace_id']}/questions",
+        headers=context["headers"],
+        json=question_payload(context, segment_id),
+    )
+    assert duplicate.status_code == 409
+
+    revised_content = question_payload(context, segment_id)["content"]
+    revised_content["prompt"] = "Which relational key references a primary key in another table?"
+    revised_content["answer_key"] = {"correct_option_id": "B"}
+    revised = client.post(
+        f"/api/v1/workspaces/{context['workspace_id']}/questions/{question['id']}/versions",
+        headers=context["headers"],
+        json={
+            "topic_id": context["topic_id"],
+            "learning_outcome_id": context["outcome_id"],
+            "content": revised_content,
+        },
+    )
+    assert revised.status_code == 201, revised.text
+    assert revised.json()["current_version_number"] == 2
+    assert len(revised.json()["versions"]) == 1
+    assert revised.json()["versions"][0]["version_number"] == 2
+
     listed = client.get(
         f"/api/v1/workspaces/{context['workspace_id']}/questions",
         headers=context["headers"],
