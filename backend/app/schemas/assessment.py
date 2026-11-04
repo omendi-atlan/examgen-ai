@@ -1,6 +1,6 @@
 """Validated request and response contracts for examination blueprints."""
 
-from uuid import UUID
+from datetime import datetime\nfrom uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -91,7 +91,7 @@ class ExamBlueprintVersionResponse(BaseModel):
     status: str
     created_by: UUID
     approved_by: UUID | None
-    approved_at: str | None
+    approved_at: datetime | None
     topic_weights: list[BlueprintTopicWeightResponse]
 
 
