@@ -1,7 +1,7 @@
 """Add append-only examiner decisions for academic extraction review."""
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "7a91c4e2d630"
 down_revision = "4f6c2a9d1e80"
