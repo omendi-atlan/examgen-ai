@@ -76,7 +76,8 @@ async function buildScannedPdf(pages: ScannedPage[]): Promise<Blob> {
   chunks.push(trailer);
   return new Blob(chunks, { type: "application/pdf" });
 }
-\nconst panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
+
+const panel = { background: "#11151e", border: "1px solid #293242", borderRadius: 14, padding: 18 } as const;
 const field = { width: "100%", padding: "11px 12px", marginTop: 6, borderRadius: 8, border: "1px solid #364154", background: "#0b1018", color: "#f4f6fa" } as const;
 const action = { border: 0, borderRadius: 8, padding: "11px 15px", background: "#ff8a35", color: "#20140b", fontWeight: 800, cursor: "pointer" } as const;
 
@@ -258,7 +259,8 @@ export default function CourseworkResourcesPage() {
       setCameraError(cause instanceof Error ? cause.message : "Could not create the scanned PDF.");
     }
   }
-\n  async function uploadResource(event: FormEvent<HTMLFormElement>) {
+
+  async function uploadResource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file || !title.trim() || !workspaceId || !subjectId) {
       setError("Choose a workspace, subject, title and file."); return;
