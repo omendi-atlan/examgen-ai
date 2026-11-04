@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
-
 from app.core.database import Base
 from app.models import (
     AcademicDocument,
