@@ -124,8 +124,9 @@ def validate_generated_set(
         ("difficulty", difficulty_targets),
         ("type", type_targets),
     ):
+        unknown = set(totals[key]) - set(expected)
         actual = {name: totals[key].get(name, 0) for name in expected}
-        if actual != expected:
+        if unknown or actual != expected:
             raise QuestionGenerationError(
                 422, f"Generated {key} mark distribution does not satisfy the approved blueprint."
             )
