@@ -381,3 +381,21 @@ EXAMGEN AI reaches the target platform state when a permitted user can:
 13. Audit the versions, source provenance and moderation decisions for every published examination.
 
 **Current status:** This is the approved target plan. The repository's existing release remains a foundation; the modules and acceptance criteria above are future implementation work until code and tests demonstrate otherwise.
+
+
+## 19. Student coursework resource experience (binding product requirement)
+
+Academic ingestion is a student-facing capability embedded in the subject/module coursework workspace. It is not a standalone ingestion portal and must not be presented as a separate administrative product. From the relevant coursework page, a student can upload a file or scan a resource using the device-supported capture flow. Supported resources include lecture notes, slides, prescribed readings, worksheets, diagrams and prior assessments. The system then validates and scans the file, extracts text and structure, performs OCR when required, retains source/page/slide provenance, and exposes processing status and usable extracted content in that same subject context.
+
+**Ownership and access rules:**
+- Every resource is linked to a canonical subject/module and records its uploader and immutable versions.
+- Default visibility is private to the uploader. Sharing with a class or cohort requires an explicit coursework-level sharing policy and authorised action.
+- Students can create resources, view their own resources, append their own versions, inspect processing status and access their own extracted segments.
+- Students cannot alter canonical subject/topic/learning-outcome taxonomy, approve/reject extraction quality, override classification, or access examiner-only moderation history.
+- Authorised lecturers/examiners/moderators can review resources according to workspace and coursework permissions; staff decisions are append-only and audited.
+- Every list, detail, version, segment, storage and download operation performs object-level authorization. A workspace membership alone must never expose another student's private resource.
+- Resource processing is asynchronous and retry-safe. A failed scan/extraction is visible with a safe reason and retry/recovery path; it must never silently appear as usable academic content.
+
+**Acceptance tests:** student upload from a subject page; scanned/image-only PDF OCR; upload status transitions; same-student version append; another student's private-resource access denied; wrong-subject access denied; explicitly shared cohort resource visible only to eligible members; taxonomy and examiner-review endpoints remain staff-only; audit/provenance retained across versions; frontend browser tests cover upload, scan, progress, retry and accessibility.
+
+This requirement changes the authorization model from the current staff-only workspace document routes. Implementation must add subject/module association and explicit resource ownership/sharing without weakening existing tenant isolation or exposing answer keys and moderation data.
