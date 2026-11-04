@@ -24,8 +24,8 @@ from app.models import (
     WorkspaceMembership,
 )
 from app.services import document_processing, document_storage
-from app.services.object_storage import persist_file
 from app.services.document_processing import claim_next_job, recover_expired_jobs
+from app.services.object_storage import persist_file
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
