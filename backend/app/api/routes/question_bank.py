@@ -6,11 +6,11 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import get_workspace_membership, require_workspace_roles
+from app.api.dependencies import (\n    enforce_auth_rate_limit,\n    get_workspace_membership,\n    require_workspace_roles,\n)
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import (
@@ -578,6 +578,7 @@ async def generate_blueprint_questions(
     blueprint_id: UUID,
     blueprint_version_id: UUID,
     payload: QuestionGenerationRequest,
+    request: Request,
     db: DatabaseSession,
     membership: ActiveMember,
     generator: QuestionGenerator,
@@ -605,6 +606,20 @@ async def generate_blueprint_questions(
         raise HTTPException(status_code=404, detail="Blueprint version not found.")
     if blueprint_version.status != BlueprintVersionStatus.APPROVED:
         raise HTTPException(status_code=409, detail="Question generation requires an approved blueprint version.")
+    if blueprint_version.question_count > 30:
+        raise HTTPException(
+            status_code=422,
+            detail="Synchronous generation is limited to 30 questions per request; split larger blueprints into batches.",
+        )
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="question_generation",
+        subject=str(membership.user_id),
+        limit=10,
+        window_seconds=3600,
+        include_client=False,
+    )
 
     subject = db.scalar(
         select(Subject).where(
