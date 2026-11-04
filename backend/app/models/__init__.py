@@ -22,7 +22,7 @@ from app.models.assessment import (
     ExamBlueprint,
     ExamBlueprintVersion,
 )
-from app.models.identity import (
+from app.models.question_bank import (\n    Question,\n    QuestionSourceCitation,\n    QuestionVersion,\n    QuestionVersionStatus,\n)\nfrom app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
     MembershipRole,
@@ -33,7 +33,7 @@ from app.models.identity import (
 )
 
 __all__ = [
-    "AcademicDocument",
+    "AcademicDocument",\n    "Question",\n    "QuestionSourceCitation",\n    "QuestionVersion",\n    "QuestionVersionStatus",
     "BlueprintOutcomeWeight",
     "BlueprintTopicWeight",
     "BlueprintVersionStatus",
