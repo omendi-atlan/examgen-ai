@@ -37,6 +37,7 @@ def settings(tmp_path):
         "document_storage_path": config.document_storage_path,
         "object_storage_bucket": config.object_storage_bucket,
         "object_storage_endpoint_url": config.object_storage_endpoint_url,
+        "object_storage_region": config.object_storage_region,
     }
     config.document_storage_path = str(tmp_path / "private")
     config.document_storage_backend = "local"
