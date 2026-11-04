@@ -7,7 +7,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import (
@@ -348,7 +348,9 @@ def _append_question_version(
     return version
 
 
-def _can_view_question(question: Question, membership: WorkspaceMembership) -> bool:
+def _can_view_question(
+    db: Session, question: Question, membership: WorkspaceMembership
+) -> bool:
     if _is_staff(membership) or question.created_by == membership.user_id:
         return True
     if question.visibility != "cohort":
@@ -357,7 +359,23 @@ def _can_view_question(question: Question, membership: WorkspaceMembership) -> b
         current = _current_version(question)
     except HTTPException:
         return False
-    return current.status == QuestionVersionStatus.APPROVED
+    if current.status != QuestionVersionStatus.APPROVED:
+        return False
+    inaccessible_source = db.scalar(
+        select(QuestionSourceCitation.id)
+        .join(DocumentVersion, DocumentVersion.id == QuestionSourceCitation.source_version_id)
+        .join(AcademicDocument, AcademicDocument.id == DocumentVersion.document_id)
+        .join(Subject, Subject.id == AcademicDocument.subject_id)
+        .where(
+            QuestionSourceCitation.question_version_id == current.id,
+            or_(
+                AcademicDocument.visibility != "cohort",
+                Subject.resource_sharing_enabled.is_(False),
+            ),
+        )
+        .limit(1)
+    )
+    return inaccessible_source is None
 
 
 @router.post(
@@ -442,7 +460,7 @@ def list_questions(
     if subject_id is not None:
         statement = statement.where(Question.subject_id == subject_id)
     questions = db.scalars(statement).unique().all()
-    visible = [item for item in questions if _can_view_question(item, membership)]
+    visible = [item for item in questions if _can_view_question(db, item, membership)]
     return [_public_question(item) for item in visible]
 
 
@@ -457,7 +475,7 @@ def get_question(
     membership: ActiveMember,
 ) -> QuestionResponse:
     question = _load_question(db, workspace_id, question_id)
-    if not _can_view_question(question, membership):
+    if not _can_view_question(db, question, membership):
         raise HTTPException(status_code=404, detail="Question not found.")
     return _public_question(question)
 
