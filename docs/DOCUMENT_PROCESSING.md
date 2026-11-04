@@ -21,7 +21,7 @@
 ## Resource and archive limits
 
 - Upload size is bounded by `MAX_DOCUMENT_UPLOAD_BYTES` (default 20 MB; maximum 100 MiB).
-- Office archives are checked for entry count, total uncompressed size, compression ratio, encryption, required package parts and symbolic links.
+- Office archives are checked for entry count, total uncompressed size (80 MiB ceiling), compression ratio, encryption, required package parts and symbolic links.
 - PDF page count is bounded by `MAX_PDF_PAGES` (default 100).
 - OCR rendering is bounded by `MAX_PDF_PAGE_PIXELS` (default 20 million pixels per page); Tesseract is terminated after `OCR_PAGE_TIMEOUT_SECONDS` (default 15 seconds) per page.
 - PPTX slide count is capped at 500. All formats enforce `MAX_EXTRACTED_CHARACTERS` (default 10 million characters).
