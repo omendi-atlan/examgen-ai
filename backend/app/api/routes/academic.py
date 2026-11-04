@@ -43,7 +43,8 @@ from app.schemas.academic import (
     TopicResponse,
 )
 from app.services.audit import record_audit_event
-from app.services.document_storage import store_upload\nfrom app.services.object_storage import delete_file
+from app.services.document_storage import store_upload
+from app.services.object_storage import delete_file
 
 router = APIRouter(tags=["academic-ingestion"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
