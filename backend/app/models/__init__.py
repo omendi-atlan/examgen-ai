@@ -40,7 +40,6 @@ from app.models.practice import (
 )
 from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
 
-
 __all__ = [
     "AcademicDocument",
     "ApiRateLimitBucket",
