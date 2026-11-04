@@ -10,6 +10,7 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from app.core.config import get_settings
 
@@ -61,14 +62,18 @@ def persist_file(source: Path, storage_key: str) -> None:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest_state.update(chunk)
     digest = digest_state.hexdigest()
+    extra_args: dict[str, object] = {"Metadata": {"sha256": digest}}
+    endpoint_host = urlsplit(settings.object_storage_endpoint_url or "").hostname or ""
+    # Cloudflare R2 encrypts all objects at rest automatically and rejects the
+    # standard x-amz-server-side-encryption header. Do not send the AWS-only SSE
+    # request header to R2; private bucket policy and TLS remain mandatory.
+    if not endpoint_host.endswith("r2.cloudflarestorage.com"):
+        extra_args["ServerSideEncryption"] = "AES256"
     client.upload_file(
         str(source),
         settings.object_storage_bucket,
         key,
-        ExtraArgs={
-            "ServerSideEncryption": "AES256",
-            "Metadata": {"sha256": digest},
-        },
+        ExtraArgs=extra_args,
     )
     head = client.head_object(Bucket=settings.object_storage_bucket, Key=key)
     if head.get("ContentLength") != source.stat().st_size or head.get("Metadata", {}).get("sha256") != digest:
