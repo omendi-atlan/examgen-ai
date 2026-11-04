@@ -321,13 +321,12 @@ def test_postgres_tenant_isolation_and_role_authorization(
 
 
 def test_postgres_academic_routes_enforce_role_and_tenant_boundaries(
-    postgres_sessions, tmp_path, monkeypatch: pytest.MonkeyPatch
+    postgres_sessions, tmp_path
 ) -> None:
     """Exercise route dependencies against PostgreSQL, not only the SQLite API fixture."""
     settings = get_settings()
     previous_storage_path = settings.document_storage_path
     settings.document_storage_path = str(tmp_path / "postgres-route-matrix")
-    app.state.test_engine = postgres_sessions.kw["bind"]
 
     def override_get_db():
         with postgres_sessions() as session:
