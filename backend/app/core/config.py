@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     jwt_issuer: str = "examgen-ai"
     document_storage_path: str = "./data/documents"
     max_document_upload_bytes: int = 26214400
+    cors_allowed_origins: str = "http://localhost:3000"
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":

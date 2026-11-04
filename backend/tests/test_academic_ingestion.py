@@ -1,12 +1,16 @@
 """Academic ingestion, provenance, extraction and taxonomy API tests."""
 
+from uuid import UUID
+
 import pytest
 from app.core.config import get_settings
 from app.core.database import Base, get_db
 from app.main import app
+from app.models import DocumentProcessingJob
+from app.services.document_processing import claim_next_job, process_job
 from docx import Document as WordDocument
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -79,8 +83,19 @@ def test_text_upload_extracts_and_retains_provenance(client: TestClient) -> None
         files={"file": ("algorithms.txt", b"Sorting\nSearching\nGraph traversal", "text/plain")},
     )
     assert response.status_code == 201
-    document = response.json()
-    assert document["current_version_number"] == 1
+    queued_document = response.json()
+    assert queued_document["current_version_number"] == 1
+    assert queued_document["versions"][0]["extraction"]["status"] == "queued"
+    with Session(app.state.test_engine) as db:
+        job_id = claim_next_job(db)
+        assert job_id is not None
+        assert process_job(db, job_id) is True
+    refreshed = client.get(
+        f"/api/v1/workspaces/{workspace_id}/documents/{queued_document['id']}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert refreshed.status_code == 200
+    document = refreshed.json()
     version = document["versions"][0]
     assert version["version_number"] == 1
     assert version["sha256"] and len(version["sha256"]) == 64
@@ -89,6 +104,7 @@ def test_text_upload_extracts_and_retains_provenance(client: TestClient) -> None
     assert version["published_on"] == "2026-09-15"
     assert version["extraction"]["status"] == "extracted"
     assert version["extraction"]["character_count"] > 0
+    assert version["extraction"]["quality_report"]["automatically_approved"] is False
 
     segments = client.get(
         f"/api/v1/workspaces/{workspace_id}/documents/{document['id']}"
@@ -226,3 +242,23 @@ def test_docx_extraction_preserves_paragraph_locators(tmp_path) -> None:
     assert result.page_count is None
     assert result.segments[0].locator.startswith("paragraph-1:")
     assert "Learning outcomes" in result.segments[0].text
+
+
+def test_upload_creates_one_durable_job_per_immutable_version(client: TestClient) -> None:
+    token, workspace_id = create_workspace(client, "queue@example.test")
+    response = client.post(
+        f"/api/v1/workspaces/{workspace_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        data={"title": "Queued source"},
+        files={"file": ("queued.txt", b"Queued content for worker", "text/plain")},
+    )
+    assert response.status_code == 201
+    version_id = response.json()["versions"][0]["id"]
+    with Session(app.state.test_engine) as db:
+        jobs = db.scalars(
+            select(DocumentProcessingJob).where(
+                DocumentProcessingJob.version_id == UUID(version_id)
+            )
+        ).all()
+        assert len(jobs) == 1
+        assert jobs[0].status.value == "queued"

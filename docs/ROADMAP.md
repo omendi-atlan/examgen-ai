@@ -30,9 +30,11 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Extract text with page, slide, paragraph and character-range locators.
 - [x] Persist extraction status, parser identity/version, metadata and addressable text segments.
 - [x] Establish explicit workspace-owned subject/topic taxonomy and human-confirmed version classification.
-- [ ] Add OCR for image-only PDFs and scanned documents.
-- [ ] Add malware scanning, managed object-storage adapter and asynchronous extraction workers.
-- [ ] Add PostgreSQL integration tests, extraction review UI and source-citation acceptance tests.
+- [x] Add page-level OCR fallback for image-only PDF pages using PDFium and Tesseract, retaining page locators and OCR provenance.
+- [ ] Add malware scanning and managed object-storage adapter.
+- [x] Add a durable database-backed extraction queue and separately deployed worker process.
+- [ ] Add PostgreSQL multi-worker integration tests, a dedicated examiner review UI and source-citation acceptance tests.
+- [x] Persist extraction quality signals; extraction is never automatically approved.
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
 - Blueprint constraints, question lifecycle, provenance, deduplication, model answers and rubrics.
