@@ -270,11 +270,11 @@
         "/practice-attempts/" + attempt.id + "/submit",
         { method: "POST" },
       );
+      await loadHistory();
       activateAttempt(result);
       setStatus(result.status === "expired"
         ? "The server deadline had passed. Your attempt was finalised."
         : "Attempt submitted. Review your score and model answers.");
-      loadHistory();
     } catch (error) {
       setStatus(error.message || "Submission failed.", true);
       await openAttempt(attempt.id);
