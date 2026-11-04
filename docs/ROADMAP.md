@@ -69,12 +69,22 @@ The repository has a Next.js coursework/authoring workspace, transitional TypeSc
 - [x] Keep answer keys and explanations out of student question-bank list responses.
 - [x] Limit generated question types to controls currently supported by the practice runner; visual/diagram question types remain gated until Phase 4 provides approved visual assets and rendering.
 - [ ] Add question moderation, approved question publication and rubric governance for formal examinations.
-- [ ] Add diagram requirement analysis and visual generation/approval gates.
+- [x] Add deterministic visual requirement analysis with explicit essential/beneficial/unnecessary determinations and recorded rationale.
+- [x] Add versioned, approvable visual assets rendered as script-free structured SVG.
+- [x] Add a publication gate that blocks essential-visual and question-coverage gaps.
 - [ ] Add robust multi-provider staging qualification and representative generation quality evaluation.
 
-### Phase 4 — Visual intelligence and moderation
-- Visual requirement analysis, generation adapter, validation, approval workflow and moderation report.
-- Required visuals block publication until approval.
+### Phase 4 — Visual intelligence and moderation (implementation in progress)
+- [x] Analyse visual requirements for a blueprint version, classifying each topic as essential, beneficial or unnecessary with recorded keyword evidence and rationale.
+- [x] Persist immutable per-topic visual requirement items with recommended diagram kinds and proposed titles.
+- [x] Add versioned visual assets: immutable spec, deterministic script-free SVG render, accessibility alt text and structural validation report.
+- [x] Auto-draft structural diagrams (flowchart, process, cycle, tree, network, ER, UML, table) from the workspace's own stated learning outcomes, marked as `auto_draft` provenance.
+- [x] Refuse to fabricate data-bearing charts; bar/line charts require explicit, authored values.
+- [x] Add append-only moderator approval/rejection decisions with mandatory rationale; structurally invalid visuals cannot be approved.
+- [x] Serve rendered SVG with a locked-down `Content-Security-Policy` and `no-store` caching.
+- [x] Add a moderation report that blocks publication until every essential visual is approved and approved questions cover all blueprint topics for the full mark total.
+- [ ] Add a provider-backed image-generation adapter for illustrative visuals, gated behind explicit approval.
+- [ ] Add an authoring-workspace visual review UI and browser-level accessibility tests.
 
 ### Phase 5 — HTML/CSS/JavaScript examination delivery (practice MVP implemented)
 - [x] Deliver the timed student practice runner as a standalone semantic HTML/CSS/vanilla JavaScript package, separate from the Next.js authoring shell; CI runs a JavaScript syntax check.
