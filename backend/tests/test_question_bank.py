@@ -227,6 +227,12 @@ def test_student_private_question_has_no_answer_key_and_isolated_from_other_stud
     assert created.status_code == 201, created.text
     question = created.json()
     assert question["visibility"] == "private"
+    denied_cohort = client.post(
+        f"/api/v1/workspaces/{context['workspace_id']}/questions",
+        headers=context["headers"],
+        json=question_payload(context, segment_id, visibility="cohort"),
+    )
+    assert denied_cohort.status_code == 403
     assert question["versions"][0]["status"] == "draft"
     assert "answer_key" not in question["versions"][0]
     assert "model_answer" not in question["versions"][0]
