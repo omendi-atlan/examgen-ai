@@ -1,5 +1,6 @@
 """Tenant-scoped workspace operations."""
 
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,13 +21,16 @@ from app.schemas.identity import CreateWorkspaceRequest, WorkspaceResponse
 from app.services.audit import record_audit_event
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+DatabaseSession = Annotated[Session, Depends(get_db)]
+AuthenticatedUser = Annotated[User, Depends(get_current_user)]
+ActiveMembership = Annotated[WorkspaceMembership, Depends(get_workspace_membership)]
 
 
 @router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
 def create_workspace(
     payload: CreateWorkspaceRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: DatabaseSession,
+    current_user: AuthenticatedUser,
 ) -> Workspace:
     """Create a workspace and its owner membership in one transaction."""
     workspace = Workspace(name=payload.name, slug=payload.slug)
@@ -60,8 +64,8 @@ def create_workspace(
 
 @router.get("", response_model=list[WorkspaceResponse])
 def list_workspaces(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: DatabaseSession,
+    current_user: AuthenticatedUser,
 ) -> list[Workspace]:
     """List only active workspaces in which the current user has active membership."""
     statement = (
@@ -80,8 +84,8 @@ def list_workspaces(
 @router.get("/{workspace_id}", response_model=WorkspaceResponse)
 def read_workspace(
     workspace_id: UUID,
-    db: Session = Depends(get_db),
-    membership: WorkspaceMembership = Depends(get_workspace_membership),
+    db: DatabaseSession,
+    membership: ActiveMembership,
 ) -> Workspace:
     """Return a workspace only to a user with active membership in that tenant."""
     workspace = db.scalar(select(Workspace).where(Workspace.id == workspace_id))
