@@ -131,6 +131,8 @@ class ExtractionReviewRequest(BaseModel):
 
 
 class ExtractionReviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     version_id: UUID
     decision: str
