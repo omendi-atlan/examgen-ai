@@ -1,6 +1,7 @@
 """Private student question-bank generation and retrieval endpoints."""
 
 from collections.abc import Sequence
+import hashlib
 from typing import Annotated
 from uuid import UUID
 
@@ -252,14 +253,28 @@ async def generate_subject_questions(
         raise HTTPException(status_code=422, detail="Generated output cites a source passage that was not supplied.")
 
     created: list[Question] = []
+    fingerprints: set[str] = set()
     try:
         for item in questions:
+            normalized_stem = " ".join(item.stem.casefold().split())
+            fingerprint = hashlib.sha256(f"{item.question_type}:{normalized_stem}".encode()).hexdigest()
+            if fingerprint in fingerprints or db.scalar(
+                select(Question.id).where(
+                    Question.workspace_id == workspace_id,
+                    Question.subject_id == subject_id,
+                    Question.created_by == membership.user_id,
+                    Question.fingerprint == fingerprint,
+                )
+            ) is not None:
+                raise HTTPException(status_code=409, detail="Generated questions duplicate an existing question in your subject bank.")
+            fingerprints.add(fingerprint)
             citations = [citation_index[source_id] for source_id in item.source_segment_ids]
             question = Question(
                 workspace_id=workspace_id,
                 subject_id=subject_id,
                 created_by=membership.user_id,
                 current_version_number=0,
+                fingerprint=fingerprint,
             )
             db.add(question)
             db.flush()
@@ -304,7 +319,10 @@ async def generate_subject_questions(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Generated question records could not be saved.") from None
+        raise HTTPException(status_code=409, detail="Generated question records could not be saved because of a duplicate or concurrent update.") from None
+    except HTTPException:
+        db.rollback()
+        raise
 
     saved = list(
         db.scalars(
