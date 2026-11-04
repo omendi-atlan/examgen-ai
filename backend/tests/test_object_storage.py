@@ -36,10 +36,12 @@ def settings(tmp_path):
         "document_storage_backend": config.document_storage_backend,
         "document_storage_path": config.document_storage_path,
         "object_storage_bucket": config.object_storage_bucket,
+        "object_storage_endpoint_url": config.object_storage_endpoint_url,
     }
     config.document_storage_path = str(tmp_path / "private")
     config.document_storage_backend = "local"
     config.object_storage_bucket = None
+    config.object_storage_endpoint_url = None
     yield config
     for key, value in previous.items():
         setattr(config, key, value)
@@ -62,12 +64,11 @@ def test_local_storage_round_trip_and_path_traversal_rejection(settings, tmp_pat
         object_storage.delete_file("../outside.txt")
 
 
-def test_s3_round_trip_verifies_checksum_and_uses_private_server_encryption(
-    settings, monkeypatch, tmp_path
-):
+def _assert_s3_round_trip(settings, monkeypatch, tmp_path, endpoint_url, expect_sse):
     fake = FakeS3()
     settings.document_storage_backend = "s3"
     settings.object_storage_bucket = "examgen-private"
+    settings.object_storage_endpoint_url = endpoint_url
     monkeypatch.setattr(object_storage, "_s3_client", lambda: fake)
 
     source = tmp_path / "upload.txt"
@@ -76,7 +77,9 @@ def test_s3_round_trip_verifies_checksum_and_uses_private_server_encryption(
     key = "ab/stable-object.txt"
 
     object_storage.persist_file(source, key)
-    assert fake.upload_args["ServerSideEncryption"] == "AES256"
+    assert ("ServerSideEncryption" in fake.upload_args) is expect_sse
+    if expect_sse:
+        assert fake.upload_args["ServerSideEncryption"] == "AES256"
     assert "ACL" not in fake.upload_args
     assert fake.objects[("examgen-private", key)][1]["sha256"] == hashlib.sha256(payload).hexdigest()
 
@@ -91,6 +94,23 @@ def test_s3_round_trip_verifies_checksum_and_uses_private_server_encryption(
     assert ("examgen-private", key) not in fake.objects
 
 
+def test_s3_round_trip_uses_server_encryption_for_generic_s3(settings, monkeypatch, tmp_path):
+    _assert_s3_round_trip(
+        settings, monkeypatch, tmp_path, "https://s3.example.com", expect_sse=True
+    )
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "https://account-id.r2.cloudflarestorage.com",
+        "https://account-id.eu.r2.cloudflarestorage.com",
+    ],
+)
+def test_r2_round_trip_omits_unsupported_sse_header(settings, monkeypatch, tmp_path, endpoint):
+    _assert_s3_round_trip(settings, monkeypatch, tmp_path, endpoint, expect_sse=False)
+
+
 def test_s3_upload_rejects_post_upload_integrity_mismatch(settings, monkeypatch, tmp_path):
     class CorruptS3(FakeS3):
         def head_object(self, Bucket, Key):
@@ -98,6 +118,7 @@ def test_s3_upload_rejects_post_upload_integrity_mismatch(settings, monkeypatch,
 
     settings.document_storage_backend = "s3"
     settings.object_storage_bucket = "examgen-private"
+    settings.object_storage_endpoint_url = "https://s3.example.com"
     fake = CorruptS3()
     monkeypatch.setattr(object_storage, "_s3_client", lambda: fake)
     source = tmp_path / "upload.txt"
