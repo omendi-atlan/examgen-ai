@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "examgen-ai"
+version = "0.1.0"
+description = "AI-powered academic examination generation, simulation, visual assessment and subject mastery platform"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.6",
+    "python-multipart>=0.0.9",
+    "PyJWT>=2.8",
+    "email-validator>=2.1",
+    "pypdf>=4.2",
+    "python-docx>=1.1",
+    "python-pptx>=0.6.23",
+    "jinja2>=3.1",
+    "openpyxl>=3.1",
+    "Pillow>=10.2",
+    "reportlab>=4.1",
+]
+
+[project.optional-dependencies]
+ocr = ["pytesseract>=0.3.10"]
+dev = ["pytest>=8.0", "httpx>=0.27", "pytest-cov>=5.0"]
+
+[project.scripts]
+examgen = "examgen.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["examgen*"]
+
+[tool.setuptools.package-data]
+examgen = ["static/*", "templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

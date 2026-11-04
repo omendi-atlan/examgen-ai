@@ -1,0 +1,23 @@
+# Runtime data: uploaded coursework, extracted content, generated PDFs, SQLite DB.
+data/
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling / test caches
+.pytest_cache/
+.coverage
+htmlcov/
+.agent_tmp/
+
+# Local environment
+.env
