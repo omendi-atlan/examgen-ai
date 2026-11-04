@@ -18,7 +18,6 @@ from app.models import (
     ClassificationMethod,
     DocumentExtraction,
     DocumentProcessingJob,
-    DocumentTextSegment,
     DocumentTopicClassification,
     DocumentVersion,
     ExtractionJobStatus,
