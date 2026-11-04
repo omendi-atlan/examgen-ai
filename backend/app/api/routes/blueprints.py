@@ -91,6 +91,7 @@ def _validate_taxonomy_scope(
             .where(
                 LearningOutcome.id.in_(outcome_ids),
                 LearningOutcome.workspace_id == workspace_id,
+                Topic.workspace_id == workspace_id,
                 Topic.subject_id == payload.subject_id,
             )
         ).all()
@@ -114,7 +115,10 @@ def _load_blueprint(
         .options(
             selectinload(ExamBlueprint.versions).selectinload(
                 ExamBlueprintVersion.topic_weights
-            )
+            ),
+            selectinload(ExamBlueprint.versions).selectinload(
+                ExamBlueprintVersion.outcome_weights
+            ),
         )
     )
     if blueprint is None:
@@ -314,7 +318,10 @@ def approve_exam_blueprint_version(
             ExamBlueprint.workspace_id == workspace_id,
             ExamBlueprintVersion.id == version_id,
         )
-        .options(selectinload(ExamBlueprintVersion.topic_weights))
+        .options(
+            selectinload(ExamBlueprintVersion.topic_weights),
+            selectinload(ExamBlueprintVersion.outcome_weights),
+        )
         .with_for_update()
     )
     if version is None:
@@ -340,6 +347,7 @@ def approve_exam_blueprint_version(
             .where(
                 LearningOutcome.id.in_(outcome_ids),
                 LearningOutcome.workspace_id == workspace_id,
+                Topic.workspace_id == workspace_id,
                 Topic.subject_id == version.subject_id,
             )
         ).all()
