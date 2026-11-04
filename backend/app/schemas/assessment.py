@@ -1,6 +1,7 @@
 """Validated request and response contracts for examination blueprints."""
 
-from datetime import datetime\nfrom uuid import UUID
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
