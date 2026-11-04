@@ -29,6 +29,10 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 
 ### Phase 2 — Academic ingestion and subject intelligence (implementation in progress)
 - [x] Secure workspace-scoped uploads for PDF, DOCX, PPTX, TXT and Markdown.
+- [ ] Deliver resource upload/scan as a native action inside each student's subject/coursework workspace, not as a separate ingestion product or administrative workflow.
+- [ ] Bind every coursework resource to its subject/module and uploader; enforce student ownership and explicit coursework-sharing rules on list, read, version, segment and download operations.
+- [ ] Allow students to upload, scan, view processing status and manage their own resource versions while keeping taxonomy authoring, extraction approval and moderation restricted to authorised staff.
+- [ ] Add end-to-end student-role tests for same-subject uploads, cross-student isolation, cross-subject isolation, version ownership, extraction visibility and staff review access.
 - [x] Enforce file-size limits, extension allowlists, file signatures, UTF-8 text validation and Office archive structure/expansion limits.
 - [x] Store sources under generated private object keys; never use user filenames as filesystem paths.
 - [x] Record immutable document versions, SHA-256 fingerprints, uploader, source reference/type, publisher and publication date.
@@ -76,3 +80,9 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 Every phase requires automated tests, documented acceptance criteria, security review appropriate to the change and human review of academic moderation policies. Do not mark a roadmap item complete until code, tests and operational documentation demonstrate it. Uploaded academic files are untrusted input; extracted text must retain provenance and must never be treated as executable instructions. Do not expose formal answer keys or unreleased rubrics to the browser.
 
 See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICATION.md) for release gates and deployment caveats.
+
+## Student coursework resource experience — product requirement
+
+Academic resource ingestion is a feature inside the student's existing subject/module coursework experience. A student opens a subject or module and uses its normal **Upload resource** or **Scan resource** action to add lecture notes, slides, prescribed readings, worksheets, diagrams or previous assessments. EXAMGEN AI performs validation, malware scanning, extraction/OCR, provenance capture and processing asynchronously in the background. The student sees progress and usable extracted material in that same coursework context. This is not a separate ingestion portal and does not require the student to operate taxonomy or examiner-review tooling.
+
+Student access is scoped to the subject/module membership and the resource's sharing policy. The default is private to the uploader unless the coursework owner explicitly enables shared access. Students may manage their own uploads and revisions; staff roles govern canonical taxonomy, classification overrides, extraction acceptance/rejection and moderation. All access is workspace- and object-authorised, audited, and covered by cross-user and cross-subject regression tests.
