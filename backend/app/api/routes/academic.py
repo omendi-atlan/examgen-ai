@@ -1,6 +1,5 @@
 """Workspace-scoped academic source ingestion and classification routes."""
 
-import logging
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -44,7 +43,6 @@ from app.schemas.academic import (
 from app.services.audit import record_audit_event
 from app.services.document_storage import resolve_storage_path, store_upload
 
-logger = logging.getLogger(__name__)
 router = APIRouter(tags=["academic-ingestion"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
 WorkspaceEditor = Annotated[
