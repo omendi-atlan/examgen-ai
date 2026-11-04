@@ -197,10 +197,8 @@ def process_job(db: Session, job_id: UUID) -> bool:
     db.rollback()
 
     try:
-        source_path = resolve_storage_path(
-            Path(get_settings().document_storage_path), storage_key
-        )
-        result = extract_document(source_path, extension, enable_ocr=True)
+        with open_storage_file(storage_key) as source_path:
+            result = extract_document(source_path, extension, enable_ocr=True)
     except Exception as exc:
         logger.exception("Document processing failed for version %s", version_id)
         return _record_failure(db, job_id, lease_token, exc)
