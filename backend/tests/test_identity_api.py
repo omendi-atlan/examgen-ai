@@ -19,6 +19,7 @@ def client():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
+    app.state.test_engine = engine
 
     def override_get_db():
         with Session(engine) as session:
@@ -106,11 +107,14 @@ def test_workspace_creation_assigns_owner_and_records_audit(client: TestClient) 
     listing = client.get("/api/v1/workspaces", headers=headers)
     assert [item["id"] for item in listing.json()] == [workspace["id"]]
 
-    with next(iter(app.dependency_overrides.values()))() as session:
+    with Session(app.state.test_engine) as session:
         membership = session.scalar(select(WorkspaceMembership))
         assert membership is not None
         assert membership.role == MembershipRole.OWNER
-        assert session.scalar(select(AuditEvent).where(AuditEvent.action == "workspace.created"))
+        audit = session.scalar(
+            select(AuditEvent).where(AuditEvent.action == "workspace.created")
+        )
+        assert audit is not None
 
 
 def test_workspace_isolation_hides_another_users_tenant(client: TestClient) -> None:
