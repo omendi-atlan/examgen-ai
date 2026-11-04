@@ -51,6 +51,7 @@ class AcademicDocument(Base):
     __tablename__ = "academic_documents"
     __table_args__ = (
         Index("ix_academic_documents_workspace_updated", "workspace_id", "updated_at"),
+        Index("ix_academic_documents_subject_owner", "workspace_id", "subject_id", "created_by"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -58,6 +59,10 @@ class AcademicDocument(Base):
         ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
     )
     title: Mapped[str] = mapped_column(String(240), nullable=False)
+    subject_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    visibility: Mapped[str] = mapped_column(String(16), default="private", nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
@@ -189,6 +194,7 @@ class Subject(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    resource_sharing_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
     topics: Mapped[list["Topic"]] = relationship(back_populates="subject", cascade="all, delete-orphan")
 
 
