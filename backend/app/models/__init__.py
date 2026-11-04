@@ -22,7 +22,6 @@ from app.models.assessment import (
     ExamBlueprint,
     ExamBlueprintVersion,
 )
-
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
