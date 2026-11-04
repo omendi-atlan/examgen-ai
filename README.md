@@ -25,6 +25,32 @@ The existing Next.js workspace may remain as the authoring/admin shell during a 
 
 Academic document ingestion, subject/topic classification, visual generation and approval, examination blueprints, reusable question bank, answer/rubric generation, examination moderation, HTML/CSS/JS exam publishing, persistent attempts, server-side marking, analytics, personalised revision and PDF exports are target capabilities, not completed features.
 
+## Python API foundation
+
+The migration begins with a single authoritative FastAPI service and PostgreSQL-backed
+persistence foundation. The existing Next.js application remains operational while domain
+capabilities move behind the Python API.
+
+For a local Python-only workflow (Python 3.12+):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+uvicorn app.main:app --app-dir backend --reload --port 8000
+pytest
+ruff check backend
+```
+
+For the integrated local stack, copy .env.example to .env, replace the local database password,
+then run docker compose up --build. The API is exposed on port 8000 and PostgreSQL data is
+stored in a named volume. The API uses SQLite only as a zero-dependency local fallback; shared
+and production environments must use PostgreSQL.
+
+Database schema changes are managed by Alembic. The service deliberately does not create
+tables automatically at startup. Liveness and readiness are available at
+/api/v1/health/live and /api/v1/health/ready.
+
 ## Run current foundation locally
 
 ```bash
