@@ -139,3 +139,28 @@ class ExtractionReviewResponse(BaseModel):
     rationale: str
     reviewed_by: UUID
     created_at: datetime
+
+
+class LearningOutcomeCreate(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
+    description: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("code", "description")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Learning outcome code and description cannot be blank.")
+        return clean
+
+
+class LearningOutcomeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workspace_id: UUID
+    topic_id: UUID
+    code: str
+    description: str
+    created_by: UUID
+    created_at: datetime

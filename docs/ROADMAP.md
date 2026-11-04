@@ -49,7 +49,9 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [ ] Complete realistic multi-megabyte PDF and OCR-heavy scan throughput tests with multiple worker replicas.
 
 ### Phase 3 — Blueprint, question bank and answer intelligence
-- Blueprint constraints, question lifecycle, provenance, deduplication, model answers and rubrics.
+- [x] Add workspace-scoped learning outcomes and immutable, versioned blueprint authoring with exact topic/outcome marks, cognitive/difficulty/question-type distributions and moderator approval.
+- [ ] Add reusable question lifecycle, source provenance, deduplication, model answers and rubrics.
+- [ ] Validate that approved question versions collectively satisfy blueprint marks, topic/outcome coverage and distribution constraints before assembly.
 
 ### Phase 4 — Visual intelligence and moderation
 - Visual requirement analysis, generation adapter, validation, approval workflow and moderation report.
