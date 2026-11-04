@@ -25,6 +25,7 @@ The test suite verifies that:
 - A document cannot be accessed across workspace boundaries.
 - A taxonomy topic from another workspace cannot be assigned to a document.
 - Extraction review history is workspace-isolated and decisions are append-only.
+- A route-wide matrix exercises all academic upload, version, document, segment, taxonomy, classification and extraction-review endpoints: non-editor members receive 403, while non-members receive a non-disclosing 404 for cross-workspace requests.
 
 ## Provenance and citation qualification
 
@@ -32,7 +33,7 @@ Every extracted segment must retain its original source locator and metadata. Ac
 
 ## Processing and concurrency qualification
 
-CI runs PostgreSQL 16 migrations and concurrency tests. Worker qualification covers distinct concurrent job claims, expired-lease recovery, fencing-token ownership and atomic shared authentication rate limits. Extraction limits are enforced before output is persisted.
+CI runs PostgreSQL 16 migrations and concurrency tests. Worker qualification covers distinct concurrent job claims, expired-lease recovery, fencing-token ownership and atomic shared authentication rate limits. Extraction limits are enforced before output is persisted. Synthetic qualification covers a multi-megabyte PDF container, concurrent 256 KB text extraction and a three-page OCR fallback harness that verifies page locators and OCR provenance. The OCR harness isolates PDFium/Tesseract integration contracts; it is not a substitute for benchmarking a real scanned corpus or multiple worker replicas.
 
 ## Release caveats
 
