@@ -52,7 +52,18 @@ from app.models.question_bank import (
 )
 
 __all__ = [
-    "AcademicDocument",\n    "AttemptMark",\n    "AttemptMarkingMethod",\n    "AttemptResponse",\n    "AttemptSubmission",\n    "ExamAttempt",\n    "ExamAttemptStatus",\n    "ExamPaper",\n    "ExamPaperMode",\n    "ExamPaperQuestion",\n    "ExamPaperStatus",\n    "ExamPaperVersion",
+    "AcademicDocument",
+    "AttemptMark",
+    "AttemptMarkingMethod",
+    "AttemptResponse",
+    "AttemptSubmission",
+    "ExamAttempt",
+    "ExamAttemptStatus",
+    "ExamPaper",
+    "ExamPaperMode",
+    "ExamPaperQuestion",
+    "ExamPaperStatus",
+    "ExamPaperVersion",
     "Question",
     "QuestionSourceCitation",
     "QuestionVersion",
