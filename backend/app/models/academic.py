@@ -109,7 +109,7 @@ class DocumentVersion(Base):
     extraction: Mapped["DocumentExtraction | None"] = relationship(
         back_populates="version", cascade="all, delete-orphan", uselist=False
     )
-    learning_outcomes: Mapped[list["LearningOutcome"]] = relationship(\n        back_populates="topic", cascade="all, delete-orphan"\n    )\n    classifications: Mapped[list["DocumentTopicClassification"]] = relationship(
+    classifications: Mapped[list["DocumentTopicClassification"]] = relationship(
         back_populates="version", cascade="all, delete-orphan"
     )
 
@@ -218,6 +218,9 @@ class Topic(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     subject: Mapped[Subject] = relationship(back_populates="topics")
+    learning_outcomes: Mapped[list["LearningOutcome"]] = relationship(
+        back_populates="topic", cascade="all, delete-orphan"
+    )
     classifications: Mapped[list["DocumentTopicClassification"]] = relationship(
         back_populates="topic", cascade="all, delete-orphan"
     )
