@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.models import DocumentVersion
-from app.services.object_storage import persist_file
+from app.services.object_storage import open_storage_file, persist_file
 from app.services.document_storage import resolve_storage_path
 
 
@@ -37,6 +37,12 @@ def migrate(*, delete_local: bool = False) -> tuple[int, int]:
             if digest.hexdigest() != version.sha256 or local_path.stat().st_size != version.size_bytes:
                 raise ValueError(f"Local source integrity check failed for version {version.id}.")
             persist_file(local_path, version.storage_key)
+            with open_storage_file(
+                version.storage_key,
+                expected_size=version.size_bytes,
+                expected_sha256=version.sha256,
+            ):
+                pass
             copied += 1
             if delete_local:
                 local_path.unlink()
