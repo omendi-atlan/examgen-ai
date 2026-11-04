@@ -38,6 +38,7 @@ from app.models import (
     WorkspaceMembership,
 )
 from app.schemas.question_bank import (
+    ApprovedBlueprintResponse,
     QuestionAuthoringResponse,
     QuestionContentInput,
     QuestionCreate,
@@ -588,6 +589,53 @@ def approve_question_version(
     )
     db.commit()
     return _authoring_question(_load_question(db, workspace_id, question.id))
+
+
+@router.get(
+    "/workspaces/{workspace_id}/subjects/{subject_id}/approved-blueprints",
+    response_model=list[ApprovedBlueprintResponse],
+)
+def list_approved_blueprints(
+    workspace_id: UUID,
+    subject_id: UUID,
+    db: DatabaseSession,
+    _membership: ActiveMember,
+) -> list[ApprovedBlueprintResponse]:
+    """Expose only approved blueprint snapshots to enrolled coursework members."""
+    subject = db.scalar(
+        select(Subject).where(
+            Subject.id == subject_id,
+            Subject.workspace_id == workspace_id,
+        )
+    )
+    if subject is None:
+        raise HTTPException(status_code=404, detail="Subject not found.")
+    rows = db.execute(
+        select(ExamBlueprint, ExamBlueprintVersion)
+        .join(ExamBlueprintVersion, ExamBlueprintVersion.blueprint_id == ExamBlueprint.id)
+        .where(
+            ExamBlueprint.workspace_id == workspace_id,
+            ExamBlueprintVersion.subject_id == subject_id,
+            ExamBlueprintVersion.status == BlueprintVersionStatus.APPROVED,
+        )
+        .order_by(ExamBlueprintVersion.created_at.desc(), ExamBlueprintVersion.version_number.desc())
+    ).all()
+    return [
+        ApprovedBlueprintResponse(
+            blueprint_id=blueprint.id,
+            blueprint_version_id=version.id,
+            subject_id=version.subject_id,
+            title=version.title,
+            duration_minutes=version.duration_minutes,
+            total_marks=version.total_marks,
+            question_count=version.question_count,
+            cognitive_distribution=version.cognitive_distribution,
+            difficulty_distribution=version.difficulty_distribution,
+            question_type_distribution=version.question_type_distribution,
+            approved_at=version.approved_at,
+        )
+        for blueprint, version in rows
+    ]
 
 
 @router.post(
