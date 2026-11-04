@@ -75,7 +75,9 @@ def persist_file(source: Path, storage_key: str) -> None:
 
 
 @contextmanager
-def open_storage_file(\n    storage_key: str, *, expected_size: int | None = None, expected_sha256: str | None = None\n) -> Iterator[Path]:
+def open_storage_file(
+    storage_key: str, *, expected_size: int | None = None, expected_sha256: str | None = None
+) -> Iterator[Path]:
     """Yield a bounded local worker copy and always remove temporary downloads."""
     key = _safe_key(storage_key)
     settings = get_settings()
@@ -84,13 +86,22 @@ def open_storage_file(\n    storage_key: str, *, expected_size: int | None = Non
         path = (root / key).resolve()
         if root not in path.parents or not path.is_file():
             raise FileNotFoundError("Stored academic source is unavailable.")
+        _verify_file(path, expected_size, expected_sha256)
         yield path
         return
     if not settings.object_storage_bucket:
         raise RuntimeError("OBJECT_STORAGE_BUCKET is required for S3 storage.")
+    client = _s3_client()
+    metadata = client.head_object(Bucket=settings.object_storage_bucket, Key=key)
+    remote_size = int(metadata.get("ContentLength", -1))
+    if remote_size < 0 or remote_size > settings.max_document_upload_bytes:
+        raise ValueError("Stored academic source exceeds the permitted size.")
+    if expected_size is not None and remote_size != expected_size:
+        raise ValueError("Stored academic source size does not match its database record.")
     with tempfile.TemporaryDirectory(prefix="examgen-object-") as directory:
         path = Path(directory) / Path(key).name
-        _s3_client().download_file(settings.object_storage_bucket, key, str(path))
+        client.download_file(settings.object_storage_bucket, key, str(path))
+        _verify_file(path, expected_size, expected_sha256)
         yield path
 
 
@@ -108,4 +119,29 @@ def delete_file(storage_key: str) -> None:
     if not settings.object_storage_bucket:
         raise RuntimeError("OBJECT_STORAGE_BUCKET is required for S3 storage.")
     _s3_client().delete_object(Bucket=settings.object_storage_bucket, Key=key)
-\n\ndef _verify_file(path: Path, expected_size: int | None, expected_sha256: str | None) -> None:\n    """Verify a stored object against immutable database metadata before parsing."""\n    if expected_size is not None and path.stat().st_size != expected_size:\n        raise ValueError("Stored academic source size does not match its database record.")\n    if expected_sha256 is not None:\n        digest = hashlib.sha256()\n        with path.open("rb") as stream:\n            for chunk in iter(lambda: stream.read(1024 * 1024), b""):\n                digest.update(chunk)\n        if digest.hexdigest() != expected_sha256:\n            raise ValueError("Stored academic source checksum does not match its database record.")\n
+
+
+def _verify_file(path: Path, expected_size: int | None, expected_sha256: str | None) -> None:
+    """Verify a stored object against immutable database metadata before parsing."""
+    if expected_size is not None and path.stat().st_size != expected_size:
+        raise ValueError("Stored academic source size does not match its database record.")
+    if expected_sha256 is not None:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != expected_sha256:
+            raise ValueError("Stored academic source checksum does not match its database record.")
+
+
+def _verify_file(path: Path, expected_size: int | None, expected_sha256: str | None) -> None:
+    """Verify a stored object against immutable database metadata before parsing."""
+    if expected_size is not None and path.stat().st_size != expected_size:
+        raise ValueError("Stored academic source size does not match its database record.")
+    if expected_sha256 is not None:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        if digest.hexdigest() != expected_sha256:
+            raise ValueError("Stored academic source checksum does not match its database record.")
