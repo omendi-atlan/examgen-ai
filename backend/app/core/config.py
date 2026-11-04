@@ -25,7 +25,13 @@ class Settings(BaseSettings):
     )
     access_token_ttl_minutes: int = 15
     jwt_issuer: str = "examgen-ai"
-    document_storage_path: str = "./data/documents"\n    document_storage_backend: str = "local"\n    object_storage_bucket: str | None = None\n    object_storage_region: str = "af-south-1"\n    object_storage_endpoint_url: str | None = None\n    object_storage_access_key: SecretStr | None = None\n    object_storage_secret_key: SecretStr | None = None
+    document_storage_path: str = "./data/documents"
+    document_storage_backend: str = "local"
+    object_storage_bucket: str | None = None
+    object_storage_region: str = "af-south-1"
+    object_storage_endpoint_url: str | None = None
+    object_storage_access_key: SecretStr | None = None
+    object_storage_secret_key: SecretStr | None = None
     max_document_upload_bytes: int = 20000000
     cors_allowed_origins: str = "http://localhost:3000"
     malware_scan_enabled: bool = False
@@ -49,7 +55,13 @@ class Settings(BaseSettings):
             "development-only-"
         ):
             raise ValueError("A production AUTH_SECRET_KEY must be explicitly configured.")
-        if self.document_storage_backend not in {"local", "s3"}:\n            raise ValueError("DOCUMENT_STORAGE_BACKEND must be local or s3.")\n        if self.document_storage_backend == "s3" and not self.object_storage_bucket:\n            raise ValueError("OBJECT_STORAGE_BUCKET is required when S3 storage is enabled.")\n        if self.document_storage_backend == "s3" and bool(self.object_storage_access_key) != bool(self.object_storage_secret_key):\n            raise ValueError("S3 access key and secret key must be configured together.")\n        if not 1 <= self.access_token_ttl_minutes <= 60:
+        if self.document_storage_backend not in {"local", "s3"}:
+            raise ValueError("DOCUMENT_STORAGE_BACKEND must be local or s3.")
+        if self.document_storage_backend == "s3" and not self.object_storage_bucket:
+            raise ValueError("OBJECT_STORAGE_BUCKET is required when S3 storage is enabled.")
+        if self.document_storage_backend == "s3" and bool(self.object_storage_access_key) != bool(self.object_storage_secret_key):
+            raise ValueError("S3 access key and secret key must be configured together.")
+        if not 1 <= self.access_token_ttl_minutes <= 60:
             raise ValueError("ACCESS_TOKEN_TTL_MINUTES must be between 1 and 60.")
         if not 1024 <= self.max_document_upload_bytes <= 104857600:
             raise ValueError("MAX_DOCUMENT_UPLOAD_BYTES must be between 1 KiB and 100 MiB.")
