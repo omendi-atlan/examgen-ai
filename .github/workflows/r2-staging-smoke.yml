@@ -2,6 +2,8 @@ name: Cloudflare R2 staging smoke test
 
 on:
   workflow_dispatch:
+  push:
+    branches: [build/cloudflare-r2-compatibility]
 
 permissions:
   contents: read
@@ -12,6 +14,7 @@ concurrency:
 
 jobs:
   verify-r2:
+    if: vars.R2_STAGING_ENABLED == 'true'
     name: Verify private R2 upload, read, checksum and cleanup
     runs-on: ubuntu-latest
     timeout-minutes: 10
