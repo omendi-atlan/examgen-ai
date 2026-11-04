@@ -22,7 +22,8 @@ dependencies = [
   "python-multipart>=0.0.20,<1.0",
   "pypdfium2>=4.30,<6.0",
   "pytesseract>=0.3.13,<1.0",
-  "Pillow>=10.0,<13.0",\n  "boto3>=1.35,<2.0",
+  "Pillow>=10.0,<13.0",
+  "boto3>=1.35,<2.0",
 ]
 
 [project.optional-dependencies]
