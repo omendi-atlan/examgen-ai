@@ -17,6 +17,7 @@ def upgrade() -> None:
         sa.Column("subject_id", sa.Uuid(), nullable=False),
         sa.Column("created_by", sa.Uuid(), nullable=False),
         sa.Column("current_version_number", sa.Integer(), nullable=False),
+        sa.Column("fingerprint", sa.String(length=64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="CASCADE"),
@@ -24,6 +25,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["created_by"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         sa.CheckConstraint("current_version_number >= 0", name="ck_question_current_version"),
+        sa.UniqueConstraint("workspace_id", "subject_id", "created_by", "fingerprint", name="uq_question_owner_fingerprint"),
     )
     op.create_index(
         "ix_questions_workspace_subject_owner",
