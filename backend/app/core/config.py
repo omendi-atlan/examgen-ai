@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +20,25 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "sqlite+pysqlite:///./examgen.db"
     api_v1_prefix: str = "/api/v1"
+    auth_secret_key: SecretStr = SecretStr(
+        "development-only-change-this-secret-before-deploy"
+    )
+    access_token_ttl_minutes: int = 15
+    jwt_issuer: str = "examgen-ai"
+
+    @model_validator(mode="after")
+    def validate_security_settings(self) -> "Settings":
+        """Reject insecure signing configuration in production."""
+        secret = self.auth_secret_key.get_secret_value()
+        if len(secret) < 32:
+            raise ValueError("AUTH_SECRET_KEY must contain at least 32 characters.")
+        if self.environment.lower() == "production" and secret.startswith(
+            "development-only-"
+        ):
+            raise ValueError("A production AUTH_SECRET_KEY must be explicitly configured.")
+        if not 1 <= self.access_token_ttl_minutes <= 60:
+            raise ValueError("ACCESS_TOKEN_TTL_MINUTES must be between 1 and 60.")
+        return self
 
 
 @lru_cache(maxsize=1)
