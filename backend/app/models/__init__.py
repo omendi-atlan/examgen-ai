@@ -23,6 +23,13 @@ from app.models.assessment import (
     ExamBlueprintVersion,
 )
 from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
+from app.models.practice import (
+    PracticeAttempt,
+    PracticeAttemptResponse,
+    PracticeAttemptStatus,
+    PracticeExam,
+    PracticeExamQuestion,
+)
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
@@ -53,6 +60,11 @@ __all__ = [
     "Question",
     "QuestionReviewStatus",
     "QuestionVersion",
+    "PracticeAttempt",
+    "PracticeAttemptResponse",
+    "PracticeAttemptStatus",
+    "PracticeExam",
+    "PracticeExamQuestion",
     "ExtractionJobStatus",
     "DocumentProcessingJob",
     "MembershipRole",
