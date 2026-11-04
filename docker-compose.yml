@@ -6,3 +6,37 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://examgen:examgen_dev_only@db:5432/examgen}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-development-only-change-this-secret-before-deploy}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-examgen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-examgen_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-examgen}
+    volumes:
+      - examgen-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-examgen} -d ${POSTGRES_DB:-examgen}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  examgen-postgres-data:
