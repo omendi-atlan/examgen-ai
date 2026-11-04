@@ -94,6 +94,18 @@ def process_job(db: Session, job_id: UUID) -> bool:
             "ocr": result.metadata.get("ocr", {"performed": False}),
         }
         extraction.error_message = None
+        extraction.quality_report = extraction_quality(
+            character_count=extraction.character_count,
+            page_count=extraction.page_count,
+            segment_count=len(result.segments),
+            status=(
+                ExtractionStatus.NEEDS_OCR.value
+                if result.needs_ocr
+                else ExtractionStatus.EXTRACTED.value
+                if result.segments
+                else ExtractionStatus.EMPTY.value
+            ),
+        )
         extraction.status = (
             ExtractionStatus.NEEDS_OCR
             if result.needs_ocr
