@@ -1,7 +1,5 @@
 """Academic ingestion, provenance, extraction and taxonomy API tests."""
 
-from io import BytesIO
-
 import pytest
 from docx import Document as WordDocument
 from fastapi.testclient import TestClient
