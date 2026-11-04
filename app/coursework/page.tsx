@@ -212,9 +212,14 @@ export default function CourseworkResourcesPage() {
       setCameraError("Wait for the camera preview before capturing a page.");
       return;
     }
+    if (scanPages.length >= 20) {
+      setCameraError("A single scanned PDF is limited to 20 pages. Upload this PDF before starting another scan.");
+      return;
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const scale = Math.min(1, 2000 / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
     const context = canvas.getContext("2d");
     if (!context) {
       setCameraError("This browser could not prepare the scan image.");
@@ -222,7 +227,7 @@ export default function CourseworkResourcesPage() {
     }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Could not encode the scan image.")), "image/jpeg", 0.9);
+      canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Could not encode the scan image.")), "image/jpeg", 0.82);
     });
     const jpeg = new Uint8Array(await blob.arrayBuffer());
     setScanPages((current) => [...current, {
