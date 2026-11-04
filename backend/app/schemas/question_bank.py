@@ -83,6 +83,7 @@ class QuestionContentInput(BaseModel):
                 if (
                     not isinstance(correct, list)
                     or not correct
+                    or len(correct) != len(set(correct))
                     or not set(correct).issubset(option_ids)
                 ):
                     raise ValueError("Multiple-select answer keys must reference valid option ids.")
@@ -102,7 +103,13 @@ class QuestionContentInput(BaseModel):
                 raise ValueError("Numeric answer keys require a numeric value.")
             if not isinstance(tolerance, (int, float)) or isinstance(tolerance, bool) or tolerance < 0:
                 raise ValueError("Numeric tolerance must be a non-negative number.")
-        elif self.question_type in {"short_answer", "long_answer", "programming"}:
+        elif self.question_type in {
+            "short_answer",
+            "long_answer",
+            "programming",
+            "diagram_interpretation",
+            "diagram_construction",
+        }:
             if not isinstance(self.rubric, dict):
                 raise ValueError("Written/programming questions require an explicit marking rubric.")
             criteria = self.rubric.get("criteria")
@@ -116,18 +123,29 @@ class QuestionContentInput(BaseModel):
             if len(criterion_marks) != len(criteria) or sum(criterion_marks) != self.marks:
                 raise ValueError("Rubric criterion marks must sum exactly to the question marks.")
         elif self.question_type == "matching":
-            if not isinstance(schema.get("left_items"), list) or not isinstance(
-                schema.get("right_items"), list
-            ) or not isinstance(answer.get("matches"), list):
+            left_items = schema.get("left_items")
+            right_items = schema.get("right_items")
+            matches = answer.get("matches")
+            if not isinstance(left_items, list) or not isinstance(right_items, list) or not isinstance(matches, list):
                 raise ValueError("Matching questions require left/right items and keyed matches.")
-        elif self.question_type == "ordering":
-            if not isinstance(schema.get("items"), list) or not isinstance(
-                answer.get("ordered_ids"), list
+            left_ids = {item.get("id") for item in left_items if isinstance(item, dict)}
+            right_ids = {item.get("id") for item in right_items if isinstance(item, dict)}
+            if not left_ids or not right_ids or any(
+                not isinstance(pair, dict)
+                or pair.get("left_id") not in left_ids
+                or pair.get("right_id") not in right_ids
+                for pair in matches
             ):
-                raise ValueError("Ordering questions require items and an ordered answer key.")
-        elif self.question_type in {"diagram_interpretation", "diagram_construction"}:
+                raise ValueError("Matching answer keys must reference valid left and right item ids.")
+        elif self.question_type == "ordering":
+            items = schema.get("items")
+            ordered_ids = answer.get("ordered_ids")
+            item_ids = {item.get("id") for item in items if isinstance(item, dict)} if isinstance(items, list) else set()
+            if not item_ids or not isinstance(ordered_ids, list) or set(ordered_ids) != item_ids or len(ordered_ids) != len(item_ids):
+                raise ValueError("Ordering answer keys must contain every item id exactly once.")
+        if self.question_type in {"diagram_interpretation", "diagram_construction"}:
             visual = self.visual_requirement
-            if not isinstance(visual, dict) or not isinstance(visual.get("description"), str):
+            if not isinstance(visual, dict) or not isinstance(visual.get("description"), str) or not visual["description"].strip():
                 raise ValueError("Diagram questions require a specific visual requirement brief.")
         return self
 
