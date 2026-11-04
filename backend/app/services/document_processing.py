@@ -74,6 +74,12 @@ def recover_expired_jobs(db: Session, *, now: float | None = None) -> int:
             job.status = ExtractionJobStatus.FAILED
             job.finished_at = current_time
             job.error_message = "Worker lease expired after the maximum number of attempts."
+            extraction = db.scalar(
+                select(DocumentExtraction).where(DocumentExtraction.version_id == job.version_id)
+            )
+            if extraction is not None:
+                extraction.status = ExtractionStatus.FAILED
+                extraction.error_message = job.error_message
         else:
             job.status = ExtractionJobStatus.QUEUED
             job.error_message = "Previous worker lease expired; job returned to the queue."
