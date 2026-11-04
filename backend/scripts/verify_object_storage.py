@@ -31,10 +31,10 @@ def verify() -> None:
     with tempfile.TemporaryDirectory(prefix="examgen-s3-smoke-") as directory:
         source = Path(directory) / "storage-smoke.txt"
         source.write_bytes(payload)
-        uploaded = False
+        upload_attempted = False
         try:
+            upload_attempted = True
             persist_file(source, key)
-            uploaded = True
             with open_storage_file(
                 key,
                 expected_size=len(payload),
@@ -42,9 +42,17 @@ def verify() -> None:
             ) as downloaded:
                 if downloaded.read_bytes() != payload:
                     raise RuntimeError("Managed storage returned content different from the source.")
-        finally:
-            if uploaded:
-                delete_file(key)
+        except Exception:
+            if upload_attempted:
+                try:
+                    delete_file(key)
+                except Exception as cleanup_error:
+                    raise RuntimeError(
+                        "Storage verification failed and temporary-object cleanup also failed."
+                    ) from cleanup_error
+            raise
+        else:
+            delete_file(key)
 
     print(
         "S3-compatible storage smoke test passed: "
