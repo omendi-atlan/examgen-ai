@@ -33,10 +33,11 @@ The repository has a Next.js student workspace, transitional TypeScript Cloudfla
 - [x] Bind coursework resources to the canonical subject and uploader; default visibility to private and require a staff-enabled subject policy for cohort sharing.
 - [x] Add student-scoped upload/list/detail/version/segment APIs while retaining staff-only taxonomy authoring, extraction decisions and governance.
 - [x] Add API integration tests for same-subject upload, private cross-student isolation, cross-subject isolation, uploader-only version ownership, subject discovery and staff-only sharing policy.
-- [ ] Add object-authorised resource download and verify storage/download isolation.
-- [ ] Deliver a dedicated in-app document scanner (camera capture currently relies on browser/device support).
-- [ ] Add browser-level end-to-end and accessibility tests for upload, scan, progress, extracted content, sharing and retry.
-- [ ] Add a student-visible retry/recovery action for failed extraction jobs.
+- [x] Add object-authorised original-version download with private/no-store headers and cross-student/cohort-policy isolation tests.
+- [x] Add a browser camera scanner that captures multiple pages, bounds resolution/page count, creates a PDF and sends it through the existing secure upload/OCR pipeline.
+- [x] Add student-visible retry/recovery for terminally failed extraction jobs, restricted to the original uploader and recorded in the audit log.
+- [ ] Add browser-level end-to-end and accessibility tests for upload, camera permissions/capture, progress, extracted content, sharing, download and retry.
+- [ ] Verify the camera scanner and generated PDFs on representative mobile and desktop browsers.
 - [x] Enforce file-size limits, extension allowlists, file signatures, UTF-8 text validation and Office archive structure/expansion limits.
 - [x] Store sources under generated private object keys; never use user filenames as filesystem paths.
 - [x] Record immutable document versions, SHA-256 fingerprints, uploader, source reference/type, publisher and publication date.
@@ -87,7 +88,7 @@ See [Ingestion Security and Qualification Controls](INGESTION_SECURITY_QUALIFICA
 
 ## Student coursework resource experience — product requirement
 
-**Implementation status:** The first student-facing coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Its current head passes GitHub Actions CI (Ruff, PostgreSQL 16 migrations, 62 pytest tests, frontend typecheck/lint and static export build). The PR is not merged or deployed. A dedicated scanner, download endpoint, browser-level E2E/accessibility tests and student-visible retry flow remain open.
+**Implementation status:** The student coursework dashboard and subject-scoped resource API are implemented on draft PR #24. Current head `974dd6c0c23e3f3f982b613a71b3927abe24b69a` passes GitHub Actions CI: Ruff, PostgreSQL 16 migrations, 64 pytest tests, frontend typecheck/lint and static export build. The dashboard supports upload, multi-page camera-to-PDF capture, processing status, extracted text, version append, authorised download and owner-controlled retry. The PR is not merged or deployed. Browser-level E2E/accessibility and real-device camera qualification remain open.
 
 Academic resource ingestion is a feature inside the student's existing subject/module coursework experience. A student opens a subject or module and uses its normal **Upload resource** or **Scan resource** action to add lecture notes, slides, prescribed readings, worksheets, diagrams or previous assessments. EXAMGEN AI performs validation, malware scanning, extraction/OCR, provenance capture and processing asynchronously in the background. The student sees progress and usable extracted material in that same coursework context. This is not a separate ingestion portal and does not require the student to operate taxonomy or examiner-review tooling.
 
