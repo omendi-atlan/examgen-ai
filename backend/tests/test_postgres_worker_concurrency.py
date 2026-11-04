@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
-
 from app.api.dependencies import enforce_auth_rate_limit
 from app.core.database import Base
 from app.models import (
