@@ -758,9 +758,7 @@ def test_staff_enabled_cohort_resources_are_visible_only_while_policy_is_enabled
         owner_membership = db.scalar(
             select(WorkspaceMembership).where(
                 WorkspaceMembership.workspace_id == UUID(workspace_id),
-                WorkspaceMembership.user_id == UUID(
-                    client.get("/api/v1/workspaces", headers=owner_headers).json()[0]["id"]
-                ) if False else WorkspaceMembership.user_id.is_not(None),
+                WorkspaceMembership.role == MembershipRole.OWNER,
             )
         )
         assert owner_membership is not None
