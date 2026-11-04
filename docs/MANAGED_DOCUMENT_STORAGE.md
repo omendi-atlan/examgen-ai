@@ -10,6 +10,10 @@
 - The browser never receives object-store credentials or object URLs. Downloads are performed by the server-side worker.
 - Worker reads verify the stored object's byte length and SHA-256 against the immutable `document_versions` row before extraction.
 
+## Local MinIO development profile
+
+For a persistent local S3-compatible target, see [MinIO development setup](MINIO_SETUP.md). The Compose profile is opt-in and binds the S3 API and console to loopback only. It is for development and integration testing, not a highly available production deployment.
+
 ## Local-to-managed migration
 
 1. Back up PostgreSQL and the private document volume.
