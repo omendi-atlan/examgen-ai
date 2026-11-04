@@ -20,26 +20,6 @@ from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.core.database import Base
-import uuid
-from datetime import datetime
-from enum import StrEnum
-
-from sqlalchemy import (
-    JSON,
-    DateTime,
-    BigInteger,
-    Integer,
-    ForeignKey,
-    Index,
-    String,
-    UniqueConstraint,
-    Uuid,
-    func,
-)
-from sqlalchemy import Enum as SqlEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
-
-from app.core.database import Base
 from app.models.base import TimestampMixin
 
 
