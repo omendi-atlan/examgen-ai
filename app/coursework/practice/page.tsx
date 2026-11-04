@@ -226,7 +226,7 @@ export default function PracticeExamsPage() {
 
   function renderResponse(question: AttemptQuestion) {
     const response = responses[question.exam_question_id] ?? {};
-    const disabled = activeAttempt?.status !== "in_progress";
+    const disabled = activeAttempt?.status !== "in_progress" || busy;
     if (["multiple_choice", "true_false"].includes(question.question_type)) {
       return <div style={{ display: "grid", gap: 8, marginTop: 12 }}>{(question.options ?? []).map((option) => (
         <label key={option.id} style={{ display: "flex", gap: 8, alignItems: "center", color: "#cbd3df" }}>
