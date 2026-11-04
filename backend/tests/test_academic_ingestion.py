@@ -1,5 +1,7 @@
 """Academic ingestion, provenance, extraction and taxonomy API tests."""
 
+from uuid import UUID
+
 import pytest
 from app.core.config import get_settings
 from app.core.database import Base, get_db
@@ -11,7 +13,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
-from uuid import UUID
 
 
 @pytest.fixture
