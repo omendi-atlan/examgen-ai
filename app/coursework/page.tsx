@@ -27,7 +27,6 @@ type ScannedPage = { jpeg: Uint8Array; width: number; height: number };
 async function buildScannedPdf(pages: ScannedPage[]): Promise<Blob> {
   if (pages.length === 0) throw new Error("Capture at least one page before creating a PDF.");
   const encoder = new TextEncoder();
-  const objects: Uint8Array[] = [];
   const objectCount = 2 + pages.length * 3;
   const offsets: number[] = [0];
   let position = 0;
@@ -225,8 +224,9 @@ export default function CourseworkResourcesPage() {
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((value) => value ? resolve(value) : reject(new Error("Could not encode the scan image.")), "image/jpeg", 0.9);
     });
+    const jpeg = new Uint8Array(await blob.arrayBuffer());
     setScanPages((current) => [...current, {
-      jpeg: new Uint8Array(await blob.arrayBuffer()),
+      jpeg,
       width: canvas.width,
       height: canvas.height,
     }]);
