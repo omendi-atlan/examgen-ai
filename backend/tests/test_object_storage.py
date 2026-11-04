@@ -36,6 +36,7 @@ def settings(tmp_path):
         "document_storage_backend": config.document_storage_backend,
         "document_storage_path": config.document_storage_path,
         "object_storage_bucket": config.object_storage_bucket,
+        "object_storage_server_side_encryption": config.object_storage_server_side_encryption,
     }
     config.document_storage_path = str(tmp_path / "private")
     config.document_storage_backend = "local"
@@ -106,3 +107,18 @@ def test_s3_upload_rejects_post_upload_integrity_mismatch(settings, monkeypatch,
     with pytest.raises(RuntimeError, match="verification failed"):
         object_storage.persist_file(source, "ab/object.txt")
     assert ("examgen-private", "ab/object.txt") not in fake.objects
+
+
+def test_s3_compatible_storage_can_omit_sse_header_for_local_minio(settings, monkeypatch, tmp_path):
+    fake = FakeS3()
+    settings.document_storage_backend = "s3"
+    settings.object_storage_bucket = "examgen-private"
+    settings.object_storage_server_side_encryption = ""
+    monkeypatch.setattr(object_storage, "_s3_client", lambda: fake)
+    source = tmp_path / "upload.txt"
+    source.write_bytes(b"minio local development")
+
+    object_storage.persist_file(source, "ab/minio-object.txt")
+
+    assert "ServerSideEncryption" not in fake.upload_args
+    assert fake.objects[("examgen-private", "ab/minio-object.txt")][0] == b"minio local development"
