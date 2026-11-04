@@ -31,6 +31,7 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://examgen:examgen_dev_only@db:5432/examgen}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-development-only-change-this-secret-before-deploy}
       DOCUMENT_STORAGE_PATH: /srv/examgen/data/documents
     volumes:
       - examgen-document-data:/srv/examgen/data/documents
