@@ -20,12 +20,12 @@
 
 ## Resource and archive limits
 
-- Upload size is bounded by `MAX_DOCUMENT_UPLOAD_BYTES` (default 25 MiB; maximum 100 MiB).
+- Upload size is bounded by `MAX_DOCUMENT_UPLOAD_BYTES` (default 20 MB; maximum 100 MiB).
 - Office archives are checked for entry count, total uncompressed size, compression ratio, encryption, required package parts and symbolic links.
 - PDF page count is bounded by `MAX_PDF_PAGES` (default 100).
 - OCR rendering is bounded by `MAX_PDF_PAGE_PIXELS` (default 20 million pixels per page); Tesseract is terminated after `OCR_PAGE_TIMEOUT_SECONDS` (default 15 seconds) per page.
 - PPTX slide count is capped at 500. All formats enforce `MAX_EXTRACTED_CHARACTERS` (default 10 million characters).
-- Resource limits should be tuned against representative course packs and available worker memory. Do not raise limits without OCR and archive-bomb testing.
+- The default 20 MB upload limit stays below ClamAV's typical 25 MB stream ceiling. If raising the upload limit, increase ClamAV StreamMaxLength, MaxFileSize and MaxScanSize consistently and verify a scan larger than the new limit. Resource limits should be tuned against representative course packs and available worker memory. Do not raise limits without OCR and archive-bomb testing.
 
 ## Operational requirements
 
