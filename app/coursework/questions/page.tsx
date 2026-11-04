@@ -151,7 +151,8 @@ export default function QuestionBankPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not create the practice exam."); }
     finally { setBusy(false); }
   }
-\n  async function generate(event: FormEvent<HTMLFormElement>) {
+
+  async function generate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedSources.length || !selectedTypes.length) {
       setError("Select at least one fully extracted source version and one question type.");
