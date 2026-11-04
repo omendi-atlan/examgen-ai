@@ -15,7 +15,7 @@
 - Worker concurrency relies on PostgreSQL `FOR UPDATE SKIP LOCKED`; SQLite is for unit tests, not multi-worker production.
 - Failed jobs retry up to the configured job limit; terminal failures retain a bounded error category.
 - OCR uses Tesseract and PDFium. The worker image installs the Tesseract executable; OCR is applied to pages without selectable text.
-- Set `TESSERACT_CMD` only when the binary is not on PATH. Do not enable untrusted PDF JavaScript or embedded actions.
+- Keep Tesseract available on the worker PATH. Do not enable untrusted PDF JavaScript or embedded actions.
 - Keep source originals immutable. Reprocessing creates a new processing job and extraction record only through an explicit administrative operation in a future release.
 
 ## Examiner review interface
