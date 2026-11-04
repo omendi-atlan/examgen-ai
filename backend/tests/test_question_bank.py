@@ -428,6 +428,12 @@ def test_question_generation_persists_blueprint_fit_and_source_provenance(
         headers=context["headers"],
     )
     assert approved.status_code == 200, approved.text
+    approved_blueprints = client.get(
+        f"/api/v1/workspaces/{context['workspace_id']}/subjects/{context['subject_id']}/approved-blueprints",
+        headers=context["headers"],
+    )
+    assert approved_blueprints.status_code == 200
+    assert approved_blueprints.json()[0]["blueprint_version_id"] == blueprint_version["id"]
 
     class FakeGenerator:
         async def generate(self, **kwargs):
