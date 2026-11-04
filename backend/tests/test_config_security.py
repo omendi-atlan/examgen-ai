@@ -1,9 +1,9 @@
 """Fail-closed production configuration validation tests."""
 
 import pytest
-from pydantic import SecretStr, ValidationError
 
 from app.core.config import Settings
+from pydantic import SecretStr, ValidationError
 
 
 def test_production_rejects_default_signing_secret() -> None:
