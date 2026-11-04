@@ -7,7 +7,8 @@
 - `DOCUMENT_STORAGE_BACKEND=s3` selects an S3-compatible private bucket for uploads and worker reads.
 - API and worker processes must use the same backend, bucket, region, endpoint and credentials/workload identity.
 - For Cloudflare R2, set `OBJECT_STORAGE_REGION=auto` and `OBJECT_STORAGE_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. R2 uses the S3-compatible API and the region value `auto`.
-- S3 objects are uploaded with server-side AES-256 encryption. No public ACL is applied. Keep the bucket private and require TLS for object API access.
+- R2 encrypts all objects and their metadata at rest automatically with AES-256. The adapter deliberately omits the unsupported AWS `x-amz-server-side-encryption` request header for R2; generic S3 providers retain the existing AES256 request behaviour.
+- No public ACL is applied. Keep the bucket private and use the HTTPS S3 endpoint.
 - The browser never receives object-store credentials or object URLs. Downloads are performed by the server-side worker.
 - Worker reads verify the stored object's byte length and SHA-256 against the immutable `document_versions` row before extraction.
 
@@ -32,7 +33,7 @@
 7. Keep `DOCUMENT_STORAGE_PATH` mounted to the existing private local document volume during migration. Do not delete local files or change database storage keys during the first cutover.
 8. Restart API and worker processes after injecting secrets, then run the provider smoke test below against the intended staging bucket.
 
-The S3 adapter now requires an explicit HTTPS endpoint whenever S3 mode is enabled. This prevents a missing endpoint from silently sending requests to the default AWS endpoint.
+The S3 adapter requires an explicit HTTPS endpoint whenever S3 mode is enabled. This prevents a missing endpoint from silently sending requests to the default AWS endpoint.
 
 ## Local-to-managed migration
 
@@ -47,7 +48,7 @@ The S3 adapter now requires an explicit HTTPS endpoint whenever S3 mode is enabl
 
 ## Provider smoke test
 
-After provisioning the private bucket and configuring the API/worker environment, run the real provider check from the backend environment:
+After provisioning the private bucket and configuring the API/worker environment, run the real provider check from the backend package environment:
 
 ```bash
 python backend/scripts/verify_object_storage.py
@@ -63,6 +64,6 @@ Set `DOCUMENT_STORAGE_BACKEND=local` for both API and worker and restore the ori
 
 - Use workload identity where available; otherwise inject credentials through a secret manager, never source control.
 - Restrict bucket permissions to the required bucket and operations.
-- Enable bucket versioning and provider-side access logging according to the deployment's retention policy.
+- Enable bucket versioning and provider-side access logging according to the retention policy.
 - Alert on object upload, head, download, integrity and delete failures.
 - Do not make the bucket public or generate browser-facing presigned URLs for source materials.
