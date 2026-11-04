@@ -192,11 +192,11 @@ def process_job(db: Session, job_id: UUID) -> bool:
     lease_token = job.lease_token
     version_id = job.version.id
     storage_key = job.version.storage_key
-    extension = job.version.file_extension
+    extension = job.version.file_extension\n    expected_size = job.version.size_bytes\n    expected_sha256 = job.version.sha256
     db.rollback()
 
     try:
-        with open_storage_file(storage_key) as source_path:
+        with open_storage_file(\n            storage_key, expected_size=expected_size, expected_sha256=expected_sha256\n        ) as source_path:
             result = extract_document(source_path, extension, enable_ocr=True)
     except Exception as exc:
         logger.exception("Document processing failed for version %s", version_id)
