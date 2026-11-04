@@ -195,8 +195,6 @@ def process_job(db: Session, job_id: UUID) -> bool:
     extension = job.version.file_extension
     expected_size = job.version.size_bytes
     expected_sha256 = job.version.sha256
-    expected_size = job.version.size_bytes
-    expected_sha256 = job.version.sha256
     db.rollback()
 
     try:
