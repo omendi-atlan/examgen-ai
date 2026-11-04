@@ -8,11 +8,13 @@ The repository currently has a Next.js student workspace, TypeScript Cloudflare 
 
 ## Approved delivery phases
 
-### Phase 0 — Architecture and migration foundation
-- Map existing UI and Worker behaviour.
-- Define Python API contracts, domain schemas, database model and migration decisions.
-- Add Python CI and a runnable FastAPI skeleton.
-- Preserve current functionality.
+### Phase 0 — Architecture and migration foundation (implementation in progress)
+- [x] Map existing UI and Worker behaviour.
+- [x] Establish the Python API service boundary, typed settings, shared SQLAlchemy metadata and Alembic migration path.
+- [x] Add FastAPI liveness/readiness endpoints, Python packaging, health-contract tests and a dedicated CI job.
+- [x] Add the API and PostgreSQL services alongside the existing Next.js container.
+- [x] Preserve current frontend and Worker behaviour; no domain logic has been duplicated or removed.
+- [ ] Confirm repository CI and integrated container startup before closing this phase.
 
 ### Phase 1 — Persistent core and security
 - Authentication, roles, PostgreSQL, migrations, workspace isolation and audit events.
