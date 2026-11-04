@@ -7,8 +7,8 @@ from app.api.routes.academic import router as academic_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.blueprints import router as blueprints_router
 from app.api.routes.health import router as health_router
-from app.api.routes.question_bank import router as question_bank_router
 from app.api.routes.practice_exams import router as practice_exams_router
+from app.api.routes.question_bank import router as question_bank_router
 from app.api.routes.student_coursework import router as student_coursework_router
 from app.api.routes.workspaces import router as workspaces_router
 from app.core.config import get_settings
