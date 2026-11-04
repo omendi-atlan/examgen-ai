@@ -18,6 +18,8 @@ from app.models import (
     AcademicDocument,
     ClassificationMethod,
     DocumentExtraction,
+    DocumentProcessingJob,
+    ExtractionJobStatus,
     DocumentTextSegment,
     DocumentTopicClassification,
     DocumentVersion,
@@ -40,7 +42,6 @@ from app.schemas.academic import (
     TopicResponse,
 )
 from app.services.audit import record_audit_event
-from app.services.document_extraction import extract_document
 from app.services.document_storage import resolve_storage_path, store_upload
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ def _version_response(version: DocumentVersion) -> DocumentVersionResponse:
             character_count=extraction.character_count,
             segment_count=len(extraction.segments),
             error_message=extraction.error_message,
+            quality_report=extraction.quality_report,
         )
     return DocumentVersionResponse(
         id=version.id,
@@ -195,50 +197,33 @@ async def _ingest_version(
     try:
         db.add(version)
         db.flush()
-        try:
-            result = extract_document(storage_path, stored.extension)
-            extraction = DocumentExtraction(
+        extraction = DocumentExtraction(
+            version_id=version.id,
+            status=ExtractionStatus.QUEUED,
+            parser_name="pending",
+            parser_version="0",
+            page_count=None,
+            character_count=0,
+            extraction_metadata={"processing": "queued"},
+            quality_report={
+                "outcome": "queued",
+                "character_count": 0,
+                "segment_count": 0,
+                "page_count": None,
+                "reasons": ["Document processing is waiting for a worker."],
+                "automatically_approved": False,
+            },
+        )
+        db.add(extraction)
+        db.flush()
+        db.add(
+            DocumentProcessingJob(
                 version_id=version.id,
-                status=(
-                    ExtractionStatus.NEEDS_OCR
-                    if result.needs_ocr
-                    else ExtractionStatus.EXTRACTED
-                    if result.segments
-                    else ExtractionStatus.EMPTY
-                ),
-                parser_name=result.parser_name,
-                parser_version=result.parser_version,
-                page_count=result.page_count,
-                character_count=sum(len(segment.text) for segment in result.segments),
-                extraction_metadata=result.metadata,
+                status=ExtractionJobStatus.QUEUED,
+                attempts=0,
+                max_attempts=3,
             )
-            db.add(extraction)
-            db.flush()
-            db.add_all(
-                [
-                    DocumentTextSegment(
-                        extraction_id=extraction.id,
-                        ordinal=index,
-                        locator=segment.locator,
-                        text=segment.text,
-                        metadata_json=segment.metadata,
-                    )
-                    for index, segment in enumerate(result.segments, start=1)
-                ]
-            )
-        except Exception as exc:
-            logger.exception("Academic document extraction failed for version %s", version.id)
-            db.add(
-                DocumentExtraction(
-                    version_id=version.id,
-                    status=ExtractionStatus.FAILED,
-                    parser_name="unavailable",
-                    parser_version="0",
-                    character_count=0,
-                    extraction_metadata={},
-                    error_message=f"Extraction failed ({type(exc).__name__}).",
-                )
-            )
+        )
         document.current_version_number = version_number
         record_audit_event(
             db,
@@ -279,7 +264,7 @@ async def upload_academic_document(
     publisher: Annotated[str | None, Form(max_length=240)] = None,
     published_on: Annotated[date | None, Form()] = None,
 ) -> DocumentResponse:
-    """Create a logical document, immutable version one and its extraction record."""
+    """Create a logical document, immutable version one and a durable processing job."""
     clean_title = title.strip()
     if not clean_title:
         raise HTTPException(status_code=422, detail="Document title cannot be blank.")
@@ -327,7 +312,7 @@ async def upload_document_version(
     publisher: Annotated[str | None, Form(max_length=240)] = None,
     published_on: Annotated[str | None, Form()] = None,
 ) -> DocumentResponse:
-    """Append a new immutable version; earlier source versions remain unchanged."""
+    """Append a new immutable version and queue extraction; older versions remain unchanged."""
     document = db.scalar(
         select(AcademicDocument)
         .where(
