@@ -51,7 +51,9 @@ def test_local_storage_round_trip_and_path_traversal_rejection(settings, tmp_pat
     key = "ab/generated.txt"
 
     object_storage.persist_file(source, key)
-    with object_storage.open_storage_file(key) as stored:
+    with object_storage.open_storage_file(
+        key, expected_size=len(b"course material"), expected_sha256=hashlib.sha256(b"course material").hexdigest()
+    ) as stored:
         assert stored.read_bytes() == b"course material"
     object_storage.delete_file(key)
     assert not (Path(settings.document_storage_path) / key).exists()
@@ -78,7 +80,9 @@ def test_s3_round_trip_verifies_checksum_and_uses_private_server_encryption(
     assert "ACL" not in fake.upload_args
     assert fake.objects[("examgen-private", key)][1]["sha256"] == hashlib.sha256(payload).hexdigest()
 
-    with object_storage.open_storage_file(key) as downloaded:
+    with object_storage.open_storage_file(
+        key, expected_size=len(payload), expected_sha256=hashlib.sha256(payload).hexdigest()
+    ) as downloaded:
         assert downloaded.read_bytes() == payload
         temporary_path = downloaded
     assert not temporary_path.exists()
