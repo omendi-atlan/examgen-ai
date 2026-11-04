@@ -312,7 +312,7 @@ test("student generates a private source-cited question bank from an approved bl
   await expect(page.getByRole("status")).toContainText("Generated 1 private draft question(s), totalling 2 marks");
   await expect(page.getByRole("heading", { name: "My question bank (1)" })).toBeVisible();
   await expect(page.getByText("Which key uniquely identifies each row in a relational table?")).toBeVisible();
-  await expect(page.getByText("Primary key")).toBeVisible();
+  await expect(page.getByText("A. Primary key", { exact: true })).toBeVisible();
   await expect(page.getByText("page:1")).toBeVisible();
   await expect(page.getByText(/answer_key|correct_option_id|model_answer/)).toHaveCount(0);
   expect(calls.some((call) => call.method === "POST" && call.path.endsWith("/generate-questions"))).toBeTruthy();
