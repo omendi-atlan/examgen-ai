@@ -1,4 +1,4 @@
-"""Fail-closed production configuration validation tests."""
+"""Fail-closed production and object-storage configuration tests."""
 
 import pytest
 from app.core.config import Settings
@@ -19,15 +19,43 @@ def test_production_requires_malware_scanning() -> None:
         )
 
 
-def test_s3_requires_bucket_and_paired_credentials() -> None:
+def test_s3_requires_bucket_endpoint_and_paired_credentials() -> None:
     with pytest.raises(ValidationError, match="OBJECT_STORAGE_BUCKET"):
         Settings(document_storage_backend="s3")
+
+    with pytest.raises(ValidationError, match="OBJECT_STORAGE_ENDPOINT_URL"):
+        Settings(
+            document_storage_backend="s3",
+            object_storage_bucket="private-examgen",
+        )
 
     with pytest.raises(ValidationError, match="configured together"):
         Settings(
             document_storage_backend="s3",
             object_storage_bucket="private-examgen",
+            object_storage_endpoint_url="https://example.r2.cloudflarestorage.com",
             object_storage_access_key=SecretStr("access"),
+        )
+
+
+def test_r2_configuration_uses_auto_region_and_https_endpoint() -> None:
+    settings = Settings(
+        document_storage_backend="s3",
+        object_storage_bucket="examgen-academic-resources",
+        object_storage_endpoint_url="https://account-id.r2.cloudflarestorage.com",
+        object_storage_access_key=SecretStr("access"),
+        object_storage_secret_key=SecretStr("secret"),
+    )
+    assert settings.object_storage_region == "auto"
+    assert settings.object_storage_endpoint_url == "https://account-id.r2.cloudflarestorage.com"
+
+
+def test_s3_rejects_plain_http_endpoint() -> None:
+    with pytest.raises(ValidationError, match="explicit HTTPS endpoint"):
+        Settings(
+            document_storage_backend="s3",
+            object_storage_bucket="private-examgen",
+            object_storage_endpoint_url="http://localhost:9000",
         )
 
 
