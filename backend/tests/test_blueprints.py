@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from app.core.database import Base, get_db
 from app.main import app
-from app.models import AuditEvent, BlueprintVersionStatus, ExamBlueprintVersion
+from app.models import AuditEvent
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -20,6 +20,7 @@ def client():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
+    app.state.test_engine = engine
 
     def override_get_db():
         with Session(engine) as session:
@@ -29,6 +30,7 @@ def client():
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    app.state.test_engine = None
     Base.metadata.drop_all(engine)
     engine.dispose()
 
@@ -158,10 +160,14 @@ def test_blueprint_create_append_and_approve_preserves_immutable_versions(
     )
     assert repeated.status_code == 409
 
-    with Session(app.state.test_engine) if hasattr(app.state, "test_engine") else Session(
-        create_engine("sqlite+pysqlite://")
-    ) as _unused:
-        pass
+    with Session(app.state.test_engine) as db:
+        events = db.scalars(
+            select(AuditEvent).where(
+                AuditEvent.workspace_id == context["workspace_id"],
+                AuditEvent.action.in_(["exam_blueprint.created", "exam_blueprint.version_created", "exam_blueprint.version_approved"]),
+            )
+        ).all()
+        assert len(events) == 4
 
 
 def test_blueprint_rejects_invalid_percentages_and_mark_totals(client: TestClient) -> None:
