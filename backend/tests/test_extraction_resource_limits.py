@@ -4,7 +4,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from app.services import document_extraction
 from pypdf import PdfWriter
 
