@@ -11,10 +11,12 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.dependencies import require_workspace_roles
 from app.core.database import get_db
 from app.models import (
+    BlueprintOutcomeWeight,
     BlueprintTopicWeight,
     BlueprintVersionStatus,
     ExamBlueprint,
     ExamBlueprintVersion,
+    LearningOutcome,
     MembershipRole,
     Subject,
     Topic,
@@ -81,6 +83,24 @@ def _validate_taxonomy_scope(
             detail="Every blueprint topic must belong to the selected subject and workspace.",
         )
 
+    outcome_ids = [item.learning_outcome_id for item in payload.outcome_weights]
+    outcomes = list(
+        db.scalars(
+            select(LearningOutcome)
+            .join(Topic, Topic.id == LearningOutcome.topic_id)
+            .where(
+                LearningOutcome.id.in_(outcome_ids),
+                LearningOutcome.workspace_id == workspace_id,
+                Topic.subject_id == payload.subject_id,
+            )
+        ).all()
+    )
+    if len(outcomes) != len(outcome_ids):
+        raise HTTPException(
+            status_code=422,
+            detail="Every blueprint learning outcome must belong to the selected subject and workspace.",
+        )
+
 
 def _load_blueprint(
     db: Session, workspace_id: UUID, blueprint_id: UUID
@@ -137,6 +157,16 @@ def _append_version(
                 target_marks=weight.target_marks,
             )
             for weight in payload.topic_weights
+        ]
+    )
+    db.add_all(
+        [
+            BlueprintOutcomeWeight(
+                version_id=version.id,
+                learning_outcome_id=weight.learning_outcome_id,
+                target_marks=weight.target_marks,
+            )
+            for weight in payload.outcome_weights
         ]
     )
     blueprint.current_version_number = version_number
@@ -302,12 +332,27 @@ def approve_exam_blueprint_version(
             )
         ).all()
     )
-    if len(topics) != len(topic_ids) or sum(
-        item.target_marks for item in version.topic_weights
-    ) != version.total_marks:
+    outcome_ids = [item.learning_outcome_id for item in version.outcome_weights]
+    outcomes = list(
+        db.scalars(
+            select(LearningOutcome)
+            .join(Topic, Topic.id == LearningOutcome.topic_id)
+            .where(
+                LearningOutcome.id.in_(outcome_ids),
+                LearningOutcome.workspace_id == workspace_id,
+                Topic.subject_id == version.subject_id,
+            )
+        ).all()
+    )
+    if (
+        len(topics) != len(topic_ids)
+        or len(outcomes) != len(outcome_ids)
+        or sum(item.target_marks for item in version.topic_weights) != version.total_marks
+        or sum(item.target_marks for item in version.outcome_weights) != version.total_marks
+    ):
         raise HTTPException(
             status_code=422,
-            detail="Blueprint topic allocation no longer satisfies workspace and total-mark constraints.",
+            detail="Blueprint topic and learning-outcome allocations no longer satisfy workspace and total-mark constraints.",
         )
 
     version.status = BlueprintVersionStatus.APPROVED
