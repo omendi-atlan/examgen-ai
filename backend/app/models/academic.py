@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Float,
     String,
     Text,
     UniqueConstraint,
@@ -284,8 +285,10 @@ class DocumentProcessingJob(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    started_at: Mapped[float | None] = mapped_column(nullable=True)
-    finished_at: Mapped[float | None] = mapped_column(nullable=True)
+    started_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lease_expires_at: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lease_token: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    finished_at: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
