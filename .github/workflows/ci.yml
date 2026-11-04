@@ -36,9 +36,22 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      clamav:
+        image: clamav/clamav:stable
+        ports:
+          - 3310:3310
+        options: >-
+          --health-cmd "clamdscan --ping=3"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 20
+          --health-start-period 120s
     env:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/examgen_test
       TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/examgen_test
+      CLAMAV_HOST: 127.0.0.1
+      CLAMAV_PORT: "3310"
+      CLAMAV_TIMEOUT_SECONDS: "30"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
