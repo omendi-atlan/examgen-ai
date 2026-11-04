@@ -4,8 +4,9 @@ This router deliberately reuses the canonical AcademicDocument, DocumentVersion,
 extraction queue, storage, provenance and audit services. It does not create a
 second document store or expose examiner governance operations to students.
 """
+from collections.abc import Iterator
 from datetime import date
-from typing import Annotated, Iterator
+from typing import Annotated
 from urllib.parse import quote
 from uuid import UUID
 
@@ -27,9 +28,9 @@ from app.models import (
     DocumentExtraction,
     DocumentProcessingJob,
     DocumentTextSegment,
+    DocumentVersion,
     ExtractionJobStatus,
     ExtractionStatus,
-    DocumentVersion,
     MembershipRole,
     Subject,
     WorkspaceMembership,
