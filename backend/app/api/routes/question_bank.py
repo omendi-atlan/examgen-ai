@@ -10,7 +10,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.dependencies import get_workspace_membership
+from app.api.dependencies import get_workspace_membership, limit_question_generation_attempts
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import (
@@ -113,6 +113,7 @@ def _load_questions(
     "/workspaces/{workspace_id}/subjects/{subject_id}/questions/generate",
     response_model=QuestionGenerationResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(limit_question_generation_attempts)],
 )
 async def generate_subject_questions(
     workspace_id: UUID,
