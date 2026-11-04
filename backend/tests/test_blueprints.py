@@ -1,6 +1,6 @@
 """Blueprint API tests for constraints, immutable versions and moderator approval."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from app.core.database import Base, get_db
@@ -177,7 +177,7 @@ def test_blueprint_create_append_and_approve_preserves_immutable_versions(
     with Session(app.state.test_engine) as db:
         events = db.scalars(
             select(AuditEvent).where(
-                AuditEvent.workspace_id == context["workspace_id"],
+                AuditEvent.workspace_id == UUID(context["workspace_id"]),
                 AuditEvent.action.in_(["exam_blueprint.created", "exam_blueprint.version_created", "exam_blueprint.version_approved"]),
             )
         ).all()
