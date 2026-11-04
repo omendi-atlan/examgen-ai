@@ -210,7 +210,7 @@ async def generate_subject_questions(
                 "original_filename": version.original_filename,
                 "version_number": version.version_number,
                 "locator": segment.locator,
-                "segment_id": segment.id,
+                "segment_id": str(segment.id),
                 "source_version_id": str(version.id),
             }
     if not source_segments:
