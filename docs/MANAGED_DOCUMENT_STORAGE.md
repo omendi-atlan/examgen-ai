@@ -16,7 +16,7 @@
 2. Provision a private S3-compatible bucket with public access blocked, TLS-only access, encryption at rest and least-privilege API/worker permissions.
 3. Configure `DOCUMENT_STORAGE_BACKEND=s3`, `OBJECT_STORAGE_BUCKET`, `OBJECT_STORAGE_REGION`, and either workload identity or the server-side access/secret pair. Configure the same values for API and worker.
 4. Keep `DOCUMENT_STORAGE_PATH` pointed at the existing local volume. Do not remove or replace that volume.
-5. Run `python -m app.scripts.migrate_document_storage` from the backend package environment. The utility checks every local file against the database SHA-256 and byte count, uploads using the existing storage key, then downloads and verifies the managed copy.
+5. Run `python backend/scripts/migrate_document_storage.py` from the backend package environment. The utility checks every local file against the database SHA-256 and byte count, uploads using the existing storage key, then downloads and verifies the managed copy.
 6. Re-run the migration after an interrupted run. Uploading to the same immutable object key is idempotent; database rows and keys are not rewritten.
 7. Deploy API and worker with the S3 backend and run ingestion plus extraction smoke tests. Keep local copies and backups during the observation window.
 8. Only after a verified backup, successful worker reads and an approved rollback window may operators retire the old local volume. The migration utility's optional `--delete-local` flag is deliberately explicit and should not be used during initial cutover.
