@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 15
     jwt_issuer: str = "examgen-ai"
     document_storage_path: str = "./data/documents"
-    max_document_upload_bytes: int = 26214400
+    max_document_upload_bytes: int = 20000000
     cors_allowed_origins: str = "http://localhost:3000"
     malware_scan_enabled: bool = False
     clamav_host: str = "clamav"
