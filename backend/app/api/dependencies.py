@@ -192,3 +192,28 @@ def limit_document_upload_attempts(
         window_seconds=3600,
         include_client=False,
     )
+
+
+def limit_question_generation_attempts(
+    request: Request,
+    db: DatabaseSession,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """Limit paid AI generation to 10 requests/account/hour and 30 per peer/hour."""
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="question_generation_ip",
+        subject="all",
+        limit=30,
+        window_seconds=3600,
+    )
+    enforce_auth_rate_limit(
+        request,
+        db,
+        scope="question_generation_account",
+        subject=str(current_user.id),
+        limit=10,
+        window_seconds=3600,
+        include_client=False,
+    )
