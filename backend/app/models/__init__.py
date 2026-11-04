@@ -22,14 +22,6 @@ from app.models.assessment import (
     ExamBlueprint,
     ExamBlueprintVersion,
 )
-from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
-from app.models.practice import (
-    PracticeAttempt,
-    PracticeAttemptResponse,
-    PracticeAttemptStatus,
-    PracticeExam,
-    PracticeExamQuestion,
-)
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
@@ -39,6 +31,15 @@ from app.models.identity import (
     Workspace,
     WorkspaceMembership,
 )
+from app.models.practice import (
+    PracticeAttempt,
+    PracticeAttemptResponse,
+    PracticeAttemptStatus,
+    PracticeExam,
+    PracticeExamQuestion,
+)
+from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
+
 
 __all__ = [
     "AcademicDocument",
