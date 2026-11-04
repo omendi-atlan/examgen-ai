@@ -39,6 +39,17 @@ from app.models.practice import (
     PracticeExamQuestion,
 )
 from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
+from app.models.visuals import (
+    DiagramKind,
+    VisualAsset,
+    VisualAssetDecision,
+    VisualAssetStatus,
+    VisualAssetVersion,
+    VisualDecision,
+    VisualRequirementAssessment,
+    VisualRequirementItem,
+    VisualRequirementLevel,
+)
 
 __all__ = [
     "AcademicDocument",
@@ -47,6 +58,7 @@ __all__ = [
     "BlueprintOutcomeWeight",
     "BlueprintTopicWeight",
     "BlueprintVersionStatus",
+    "DiagramKind",
     "ExamBlueprint",
     "ExamBlueprintVersion",
     "ClassificationMethod",
@@ -72,6 +84,14 @@ __all__ = [
     "Subject",
     "Topic",
     "User",
+    "VisualAsset",
+    "VisualAssetDecision",
+    "VisualAssetStatus",
+    "VisualAssetVersion",
+    "VisualDecision",
+    "VisualRequirementAssessment",
+    "VisualRequirementItem",
+    "VisualRequirementLevel",
     "Workspace",
     "WorkspaceMembership",
 ]
