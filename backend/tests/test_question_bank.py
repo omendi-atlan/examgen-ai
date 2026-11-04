@@ -220,6 +220,22 @@ def test_question_generation_persists_source_cited_private_questions_without_ans
         assert stored[0].generation_model == "test-model"
         assert stored[0].source_citations[0]["source_version_id"] == context["version_id"]
 
+    duplicate = client.post(
+        f"/api/v1/workspaces/{context['workspace_id']}/subjects/{context['subject_id']}/questions/generate",
+        headers=context["headers"],
+        json={
+            "source_version_ids": [context["version_id"]],
+            "question_count": 2,
+            "total_marks": 5,
+            "question_types": ["multiple_choice", "short_answer"],
+            "difficulty": "medium",
+            "cognitive_levels": ["apply", "analyze"],
+        },
+    )
+    assert duplicate.status_code == 409
+    with Session(app.state.test_engine) as db:
+        assert db.scalar(select(func.count(Question.id))) == 2
+
 
 def test_question_generation_rejects_unowned_private_sources(
     client: TestClient,
