@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
+import { FormEvent, use, useCallback, useState } from "react";
 import Link from "next/link";
 
 type Segment = { id: string; locator: string; text: string };
@@ -31,8 +31,9 @@ const action = { border: 0, borderRadius: 8, padding: "11px 15px", background: "
 export default function CourseworkResourcesPage({
   params,
 }: {
-  params: { workspaceId: string; subjectId: string };
+  params: Promise<{ workspaceId: string; subjectId: string }>;
 }) {
+  const { workspaceId, subjectId } = use(params);
   const [apiBase, setApiBase] = useState(process.env.NEXT_PUBLIC_EXAMGEN_API_URL ?? "http://localhost:8000");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,7 +50,7 @@ export default function CourseworkResourcesPage({
   const [notice, setNotice] = useState("");
 
   const base = apiBase.replace(/\/$/, "");
-  const endpoint = `/api/v1/workspaces/${params.workspaceId}/subjects/${params.subjectId}/resources`;
+  const endpoint = `/api/v1/workspaces/${workspaceId}/subjects/${subjectId}/resources`;
 
   const request = useCallback(async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
     const response = await fetch(`${base}/api/v1${path}`, {
