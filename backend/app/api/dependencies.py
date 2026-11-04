@@ -1,6 +1,7 @@
 """Reusable authentication and workspace-authorization dependencies."""
 
 from collections.abc import Callable
+from typing import Annotated
 from uuid import UUID
 
 import jwt
@@ -20,11 +21,13 @@ from app.models import (
 )
 
 _bearer = HTTPBearer(auto_error=False)
+DatabaseSession = Annotated[Session, Depends(get_db)]
+BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(get_db),
+    credentials: BearerCredentials,
+    db: DatabaseSession,
 ) -> User:
     """Resolve a valid bearer token to an active persisted user."""
     unauthorized = HTTPException(
@@ -47,8 +50,8 @@ def get_current_user(
 
 def get_workspace_membership(
     workspace_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: DatabaseSession,
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> WorkspaceMembership:
     """Require active membership in the requested active workspace."""
     workspace = db.scalar(select(Workspace).where(Workspace.id == workspace_id))
@@ -73,7 +76,10 @@ def require_workspace_roles(
     """Build a dependency that additionally enforces workspace roles."""
 
     def dependency(
-        membership: WorkspaceMembership = Depends(get_workspace_membership),
+        membership: Annotated[
+            WorkspaceMembership,
+            Depends(get_workspace_membership),
+        ],
     ) -> WorkspaceMembership:
         if membership.role not in allowed_roles:
             raise HTTPException(status_code=403, detail="Insufficient workspace role.")
