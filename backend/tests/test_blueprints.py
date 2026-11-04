@@ -242,7 +242,7 @@ def test_blueprint_is_workspace_isolated_and_students_cannot_approve(client: Tes
     with Session(app.state.test_engine) as db:
         membership = db.scalar(
             select(WorkspaceMembership).where(
-                WorkspaceMembership.workspace_id == context["workspace_id"]
+                WorkspaceMembership.workspace_id == UUID(context["workspace_id"])
             )
         )
         assert membership is not None
