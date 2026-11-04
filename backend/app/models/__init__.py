@@ -22,12 +22,6 @@ from app.models.assessment import (
     ExamBlueprint,
     ExamBlueprintVersion,
 )
-from app.models.question_bank import (
-    Question,
-    QuestionSourceCitation,
-    QuestionVersion,
-    QuestionVersionStatus,
-)
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
@@ -36,6 +30,12 @@ from app.models.identity import (
     User,
     Workspace,
     WorkspaceMembership,
+)
+from app.models.question_bank import (
+    Question,
+    QuestionSourceCitation,
+    QuestionVersion,
+    QuestionVersionStatus,
 )
 
 __all__ = [
