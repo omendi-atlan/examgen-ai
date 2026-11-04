@@ -1,13 +1,5 @@
 """Canonical SQLAlchemy models registered with the shared metadata."""
 
-from app.models.assessment import (
-    BlueprintOutcomeWeight,
-    BlueprintTopicWeight,
-    BlueprintVersionStatus,
-    ExamBlueprint,
-    ExamBlueprintVersion,
-)
-
 from app.models.academic import (
     AcademicDocument,
     ClassificationMethod,
@@ -23,6 +15,14 @@ from app.models.academic import (
     Subject,
     Topic,
 )
+from app.models.assessment import (
+    BlueprintOutcomeWeight,
+    BlueprintTopicWeight,
+    BlueprintVersionStatus,
+    ExamBlueprint,
+    ExamBlueprintVersion,
+)
+
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
