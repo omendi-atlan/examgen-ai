@@ -1,10 +1,11 @@
+"""Canonical SQLAlchemy models registered with the shared metadata."""
+
 from app.models.assessment import (
     BlueprintTopicWeight,
     BlueprintVersionStatus,
     ExamBlueprint,
     ExamBlueprintVersion,
 )
-"""Canonical SQLAlchemy models registered with the shared metadata."""
 
 from app.models.academic import (
     AcademicDocument,
