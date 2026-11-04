@@ -17,6 +17,7 @@ jobs:
       - run: npm install
       - run: touch .env && docker compose config --quiet
       - run: npm run typecheck
+      # Student exam delivery stays framework-independent and is syntax-checked directly.
       - run: node --check public/practice/app.js
       - run: npm run lint
       - run: npm run build
