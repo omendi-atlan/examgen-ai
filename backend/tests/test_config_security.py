@@ -1,7 +1,6 @@
 """Fail-closed production configuration validation tests."""
 
 import pytest
-
 from app.core.config import Settings
 from pydantic import SecretStr, ValidationError
 
