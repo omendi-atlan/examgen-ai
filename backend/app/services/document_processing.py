@@ -2,8 +2,8 @@
 
 import logging
 import time
-from threading import Event, Thread
 from pathlib import Path
+from threading import Event, Thread
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
