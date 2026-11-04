@@ -10,6 +10,7 @@
     activeAttempt: null,
     responses: {},
     saveTimers: new Map(),
+    savePromises: new Map(),
     timerId: null,
     lastFinalisedAttempt: "",
   };
@@ -228,24 +229,51 @@
     const attempt = state.activeAttempt;
     if (!attempt || attempt.status !== "in_progress") return;
     state.saveTimers.delete(questionId);
+    const inFlight = state.savePromises.get(questionId);
+    if (inFlight) {
+      await inFlight;
+      if (state.activeAttempt?.id === attempt.id && state.activeAttempt.status === "in_progress") {
+        return saveResponse(questionId);
+      }
+      return;
+    }
+
+    const snapshot = JSON.stringify(state.responses[questionId] || {});
+    const task = api(
+      "/workspaces/" + state.workspaceId + "/subjects/" + state.subjectId +
+      "/practice-attempts/" + attempt.id + "/responses/" + questionId,
+      jsonOptions("PUT", { response: JSON.parse(snapshot) }),
+    );
+    state.savePromises.set(questionId, task);
     try {
-      await api(
-        "/workspaces/" + state.workspaceId + "/subjects/" + state.subjectId +
-        "/practice-attempts/" + attempt.id + "/responses/" + questionId,
-        jsonOptions("PUT", { response: state.responses[questionId] || {} }),
-      );
+      await task;
       byId("save-indicator").textContent = state.saveTimers.size ? "Saving responses…" : "All responses saved";
     } catch (error) {
       byId("save-indicator").textContent = "Autosave issue: " + error.message;
       if (error.message.toLowerCase().includes("expired")) {
         await openAttempt(attempt.id);
       }
+    } finally {
+      if (state.savePromises.get(questionId) === task) state.savePromises.delete(questionId);
+    }
+
+    if (
+      state.activeAttempt?.id === attempt.id &&
+      state.activeAttempt.status === "in_progress" &&
+      JSON.stringify(state.responses[questionId] || {}) !== snapshot
+    ) {
+      const timer = window.setTimeout(() => saveResponse(questionId), 150);
+      state.saveTimers.set(questionId, timer);
     }
   }
 
   async function flushResponses() {
     const attempt = state.activeAttempt;
     if (!attempt) return;
+    await Promise.all([...state.savePromises.values()]);
+    if (state.activeAttempt?.id !== attempt.id || state.activeAttempt.status !== "in_progress") {
+      throw new Error("The practice attempt has already been finalised.");
+    }
     for (const question of attempt.questions) {
       if (state.saveTimers.has(question.exam_question_id)) {
         window.clearTimeout(state.saveTimers.get(question.exam_question_id));
