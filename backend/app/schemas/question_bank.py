@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 QUESTION_TYPES = {
     "multiple_choice",
@@ -22,7 +22,6 @@ QUESTION_TYPES = {
 }
 COGNITIVE_LEVELS = {"remember", "understand", "apply", "analyze", "evaluate", "create"}
 DIFFICULTIES = {"easy", "medium", "hard"}
-STAFF_ROLES = {"owner", "admin", "examiner", "moderator"}
 
 
 class QuestionContentInput(BaseModel):
@@ -193,7 +192,7 @@ class QuestionVersionAuthoringResponse(QuestionVersionPublicResponse):
     content_fingerprint: str
     created_by: UUID
     approved_by: UUID | None
-    approved_at: datetime
+    approved_at: datetime | None
 
 
 class QuestionResponse(BaseModel):
