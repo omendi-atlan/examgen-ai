@@ -1,6 +1,7 @@
 """Canonical SQLAlchemy models registered with the shared metadata."""
 
 from app.models.assessment import (
+    BlueprintOutcomeWeight,
     BlueprintTopicWeight,
     BlueprintVersionStatus,
     ExamBlueprint,
@@ -34,6 +35,7 @@ from app.models.identity import (
 
 __all__ = [
     "AcademicDocument",
+    "BlueprintOutcomeWeight",
     "BlueprintTopicWeight",
     "BlueprintVersionStatus",
     "ExamBlueprint",
