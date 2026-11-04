@@ -900,6 +900,8 @@ def test_student_can_retry_only_their_failed_coursework_extraction(client: TestC
         ExtractionJobStatus,
         ExtractionStatus,
         MembershipRole,
+        MembershipStatus,
+        User,
         WorkspaceMembership,
     )
 
