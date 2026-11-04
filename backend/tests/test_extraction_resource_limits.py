@@ -1,5 +1,6 @@
 """Resource-bound extraction regression tests."""
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -170,7 +171,6 @@ def test_ocr_fallback_preserves_page_provenance_for_every_scanned_page(
 def test_real_scanned_pdf_ocr_runs_concurrently_and_preserves_page_locators(
     tmp_path: Path,
 ) -> None:
-    from concurrent.futures import ThreadPoolExecutor
     from PIL import Image, ImageDraw, ImageFont
 
     font = ImageFont.load_default(size=48)
