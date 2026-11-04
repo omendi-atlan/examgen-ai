@@ -1,7 +1,7 @@
 """Private student question-bank generation and retrieval endpoints."""
 
-from collections.abc import Sequence
 import hashlib
+from collections.abc import Sequence
 from typing import Annotated
 from uuid import UUID
 
