@@ -1,5 +1,6 @@
 """Real PostgreSQL tests for worker lease recovery and SKIP LOCKED concurrency."""
 
+import hashlib
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
