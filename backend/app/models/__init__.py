@@ -15,7 +15,14 @@ from app.models.academic import (
     Subject,
     Topic,
 )
-from app.models.assessment import (\n    BlueprintOutcomeWeight,\n    BlueprintTopicWeight,\n    BlueprintVersionStatus,\n    ExamBlueprint,\n    ExamBlueprintVersion,\n)\nfrom app.models.identity import (
+from app.models.assessment import (
+    BlueprintOutcomeWeight,
+    BlueprintTopicWeight,
+    BlueprintVersionStatus,
+    ExamBlueprint,
+    ExamBlueprintVersion,
+)
+from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
     MembershipRole,
@@ -26,7 +33,12 @@ from app.models.assessment import (\n    BlueprintOutcomeWeight,\n    BlueprintT
 )
 
 __all__ = [
-    "AcademicDocument",\n    "BlueprintOutcomeWeight",\n    "BlueprintTopicWeight",\n    "BlueprintVersionStatus",\n    "ExamBlueprint",\n    "ExamBlueprintVersion",
+    "AcademicDocument",
+    "BlueprintOutcomeWeight",
+    "BlueprintTopicWeight",
+    "BlueprintVersionStatus",
+    "ExamBlueprint",
+    "ExamBlueprintVersion",
     "ApiRateLimitBucket",
     "AuditEvent",
     "ClassificationMethod",
@@ -35,7 +47,8 @@ __all__ = [
     "DocumentTextSegment",
     "DocumentTopicClassification",
     "DocumentVersion",
-    "ExtractionStatus",\n    "LearningOutcome",
+    "ExtractionStatus",
+    "LearningOutcome",
     "ExtractionJobStatus",
     "DocumentProcessingJob",
     "MembershipRole",
