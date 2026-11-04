@@ -15,6 +15,7 @@ from app.models.academic import (
     Subject,
     Topic,
 )
+from app.models.questions import Question, QuestionReviewStatus, QuestionVersion
 from app.models.identity import (
     ApiRateLimitBucket,
     AuditEvent,
