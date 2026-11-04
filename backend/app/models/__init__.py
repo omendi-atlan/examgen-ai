@@ -1,3 +1,9 @@
+from app.models.assessment import (
+    BlueprintTopicWeight,
+    BlueprintVersionStatus,
+    ExamBlueprint,
+    ExamBlueprintVersion,
+)
 """Canonical SQLAlchemy models registered with the shared metadata."""
 
 from app.models.academic import (
@@ -26,6 +32,10 @@ from app.models.identity import (
 
 __all__ = [
     "AcademicDocument",
+    "BlueprintTopicWeight",
+    "BlueprintVersionStatus",
+    "ExamBlueprint",
+    "ExamBlueprintVersion",
     "ApiRateLimitBucket",
     "AuditEvent",
     "ClassificationMethod",
