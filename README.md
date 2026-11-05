@@ -35,4 +35,14 @@ Never commit `.env.local`, `.env`, credentials, or API keys. Configure secrets i
 ### Scope and accuracy
 The sample assessment is demonstration content, not a verified curriculum paper. The current generation endpoint creates validated question sets. Objective items can be scored locally; written responses still require a rubric-based marking service. Authentication, persistent question-bank workflows, source-document ingestion, visual approval, adaptive revision scheduling and PDF exports are planned modules, not claimed as completed functionality.
 
-See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+## Examination Intelligence Plugin (EIP)
+
+A standalone, independently versioned plugin specification and implementation plan has been approved and is being developed on an isolated feature branch.
+
+- [EIP module specification](plugins/examination-intelligence/README.md)
+- [EIP implementation skill plan](plugins/examination-intelligence/SKILL.md)
+- [EIP acceptance test plan](docs/EXAMINATION_INTELLIGENCE_ACCEPTANCE_TESTS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Roadmap](docs/ROADMAP.md)
+
+The EIP specification is not a claim that the module has been implemented or qualified. The acceptance matrix is established; runtime execution is pending implementation. Existing student workflows and current platform capabilities remain the compatibility baseline.
