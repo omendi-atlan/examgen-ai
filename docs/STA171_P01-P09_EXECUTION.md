@@ -279,10 +279,33 @@ Adaptive practice, moderation and topic analytics must be based on stored, versi
 | P02 blueprint policy and 120-mark demonstration | Specified; not yet a persisted blueprint service |
 | P03 original STA171 seed questions | Authored in this document; not yet persisted in a question bank |
 | P04 diagram specifications | Specified; rendered assets and approvals outstanding |
-| P05 frontend marks guard and STA171 defaults | Implemented on feature branch; API enforcement and CI unverified |
-| P06 PDF production | Not implemented |
-| P07 QA matrix | Defined; tests not executed |
+| P05 frontend and Cloudflare Worker marks guard | Implemented on feature branch; CI pending |
+| P06 practice examination, memorandum and blueprint/QA PDFs | Generated as downloadable delivery artifacts; application-integrated export remains unimplemented |
+| P07 QA matrix and executable marks/duration boundary tests | Added to CI; execution result pending |
 | P08 delivery/persistence/marking | Requirements defined; implementation not verified |
 | P09 integration/release | Blocked by unfinished upstream services and tests |
 
 **Do not merge or label this feature release-ready until API-side validation, tests, and the remaining acceptance gates have been completed.**
+
+
+## November 6, 2026 — delivery continuation
+
+### Practice assessment documents generated
+- `STA171_Practice_Examination_120_Marks.pdf` and editable `.docx`.
+- `STA171_Practice_Memorandum_120_Marks.pdf` and editable `.docx`.
+- `STA171_Blueprint_and_QA_Report.pdf`.
+- A ZIP delivery bundle containing the above and delivery notes.
+
+These are original practice documents aligned to SO1–SO6. The 120-mark blueprint and suggested 180-minute duration are proposed practice settings, not official institution-issued requirements. The practice paper and memorandum were exported and their text/ZIP integrity checked. Formal academic moderation and source-page visual verification remain release gates.
+
+### Backend marks validation
+- Added shared worker-side `isValidTotalMarks` and `isValidDuration` validators.
+- Worker now accepts whole-number totals 1–149 and rejects 150 or greater.
+- Worker request prompt explicitly prohibits 150+ totals.
+- Added Node built-in tests for 100, 120, 149, 150, malformed marks and duration boundaries.
+- Added `npm test` to the CI workflow.
+
+### Outstanding
+- CI has not yet returned a completed result for the latest branch head.
+- No application-integrated PDF export or persistent examination/question-bank storage is claimed.
+- Do not merge until CI and independent academic/functional review pass.
