@@ -127,7 +127,7 @@ Using the same grouped table, estimate the mode with the grouped-mode formula. T
 ### Q-SO5-001 — Grouped dispersion (8 marks)
 Using the same grouped table and midpoints, estimate the grouped population variance, standard deviation and coefficient of variation.
 
-**Answer:** Mean = 18. Sum f(x−mean)² = 2(5−18)² + 3(15−18)² + 5(25−18)² = 580. Population variance = 580/10 = 58. Standard deviation = √58 ≈ 7.616. CV ≈ (7.616/18)×100 = 42.31%.
+**Answer:** Mean = 18. Sum f(x−mean)² = 2(5−18)² + 3(15−18)² + 5(25−18)² = 610. Population variance = 610/10 = 61. Standard deviation = √61 ≈ 7.810. CV ≈ (7.810/18)×100 = 43.39%.
 
 ### Q-SO6-001 — Objective probability (4 marks)
 A fair six-sided die is rolled once. Let A be the event of obtaining an even number and B the event of obtaining a number greater than four. Calculate P(A ∪ B).
