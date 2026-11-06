@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isValidTotalMarks, isValidDuration } from "../worker/src/limits.js";
+import { isValidTotalMarks, isValidDuration } from "../worker/src/limits.ts";
 
 test("accepts examination totals above 100 and below 150", () => {
   for (const total of [100, 120, 149]) assert.equal(isValidTotalMarks(total), true, String(total));
