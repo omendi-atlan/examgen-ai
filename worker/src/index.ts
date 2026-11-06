@@ -1,4 +1,4 @@
-import { isValidTotalMarks, isValidDuration } from "./limits.js";
+import { isValidTotalMarks, isValidDuration } from "./limits.ts";
 
 export interface Env {
   OPENAI_API_KEY: string;
