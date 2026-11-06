@@ -1,3 +1,5 @@
+import { isValidTotalMarks, isValidDuration } from "./limits.ts";
+
 export interface Env {
   OPENAI_API_KEY: string;
   OPENAI_MODEL?: string;
@@ -127,8 +129,8 @@ export default {
       subject.length < 2 || subject.length > 160 ||
       topics.length < 1 || topics.length > 20 ||
       !topics.every((topic) => typeof topic === "string" && topic.trim().length >= 2 && topic.length <= 120) ||
-      !Number.isInteger(totalMarks) || Number(totalMarks) < 5 || Number(totalMarks) > 200 ||
-      !Number.isInteger(durationMinutes) || Number(durationMinutes) < 10 || Number(durationMinutes) > 240 ||
+      !isValidTotalMarks(totalMarks) ||
+      !isValidDuration(durationMinutes) ||
       (mode !== "practice" && mode !== "simulation") ||
       !["balanced", "foundation", "challenging", "advanced"].includes(String(difficulty))
     ) return response({ error: "Invalid examination configuration. Check subject, topics, marks, duration, mode and difficulty." }, 400, origin, allowed);
@@ -145,7 +147,7 @@ export default {
       `Mode: ${mode}`,
       `Difficulty: ${difficulty}`,
       `Duration: ${durationMinutes} minutes`,
-      `Total marks: exactly ${totalMarks}`,
+      `Total marks: exactly ${totalMarks} (must be an integer from 1 through 149; never generate 150 or more)`,
       "Return JSON with title, subject, durationMinutes, totalMarks, instructions (array), and questions (array).",
       "Each question must contain id, section, prompt, type (multiple_choice|dropdown|short_answer|long_answer|numeric), marks (positive integer), difficulty (foundation|intermediate|advanced), answer and explanation.",
       "Objective questions must contain 4 distinct options and an answer exactly matching one option. Written questions must not contain options.",
